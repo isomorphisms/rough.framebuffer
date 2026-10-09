@@ -27,9 +27,8 @@ does not secretly substitute Node if Field Mouse is unavailable.
 
 `make test` verifies a C raster fixture. `FIELD_MOUSE=/path/to/fieldmouse
 make test-fieldmouse` exercises the actual Field Mouse executor, including
-repeated seeded output. A separate Node oracle test may be used to compare
-numeric operations to the pinned Rough.js implementation but does not count
-as Field Mouse execution.
+repeated seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial geometry
+against pinned Rough.js math; it does not replace Field Mouse execution.
 
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,

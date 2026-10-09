@@ -1,0 +1,189 @@
+// Rough.js stroke geometry translated into Field Mouse.
+// Upstream: rough-stuff/rough src/renderer.ts, src/math.ts,
+// revision 56a2762171b1294d643501e8d14f120db6b27bd7 (MIT).
+// This file executes under dilapidated-shed/fieldmouse, not Node.
+
+function selected(shape, key, defaultValue) {
+  var value ← shape[key];
+  if (value ≟ undefined) return defaultValue;
+  return value;
+}
+
+function optionsFor(scene, shape) {
+  var seed ← selected(shape, "seed", selected(scene, "seed", 1));
+  return {
+    seed: seed,
+    roughness: selected(shape, "roughness", 1),
+    bowing: selected(shape, "bowing", 1),
+    maxRandomnessOffset: selected(shape, "maxRandomnessOffset", 2),
+    preserveVertices: selected(shape, "preserveVertices", Ø),
+    disableMultiStroke: selected(shape, "disableMultiStroke", Ø)
+  };
+}
+
+// For positive 31-bit seeds, this is equivalent to Rough.js's
+// (Math.imul(48271, seed) & 0x7fffffff) / 0x80000000.
+// Long division replaces bitwise operations unsupported by Field Mouse.
+function randomUnit(options) {
+  var product ← options.seed * 48271;
+  var modulus ← 2147483648;
+  var multiple ← modulus;
+  while (multiple * 2 <= product) multiple ← multiple * 2;
+  while (multiple >= modulus) {
+    if (product >= multiple) product ← product - multiple;
+    multiple ← multiple / 2;
+  }
+  options.seed ← product;
+  return product / modulus;
+}
+
+function randomOffset(amount, options, gain) {
+  return options.roughness * gain * (randomUnit(options) * 2 * amount - amount);
+}
+
+function squareRoot(number) {
+  if (number <= 0) return 0;
+  var root ← number;
+  if (root < 1) root ← 1;
+  var count ← 0;
+  while (count < 24) {
+    root ← (root + number / root) / 2;
+    count ← count + 1;
+  }
+  return root;
+}
+
+function addOperation(ops, kind, numbers) {
+  ops[ops.length] ← {op: kind, data: numbers};
+}
+
+// Faithful ordering of Rough.js _line's random-number consumption.
+function singleLine(ops, x1, y1, x2, y2, options, overlay) {
+  var dx ← x2 - x1;
+  var dy ← y2 - y1;
+  var lengthSquare ← dx * dx + dy * dy;
+  var length ← squareRoot(lengthSquare);
+  var gain ← 1;
+  if (length > 500) gain ← 0.4;
+  else {
+    if (length >= 200) gain ← -0.0016668 * length + 1.233334;
+  }
+
+  var offset ← options.maxRandomnessOffset;
+  if (offset * offset * 100 > lengthSquare) offset ← length / 10;
+  var half ← offset / 2;
+  var diverge ← 0.2 + randomUnit(options) * 0.2;
+  var midX ← options.bowing * options.maxRandomnessOffset * (y2 - y1) / 200;
+  var midY ← options.bowing * options.maxRandomnessOffset * (x1 - x2) / 200;
+  midX ← randomOffset(midX, options, gain);
+  midY ← randomOffset(midY, options, gain);
+
+  var startX ← x1;
+  var startY ← y1;
+  if (!options.preserveVertices) {
+    if (overlay) {
+      startX ← startX + randomOffset(half, options, gain);
+      startY ← startY + randomOffset(half, options, gain);
+    } else {
+      startX ← startX + randomOffset(offset, options, gain);
+      startY ← startY + randomOffset(offset, options, gain);
+    }
+  }
+  addOperation(ops, "M", [startX, startY]);
+
+  var displacement ← offset;
+  if (overlay) displacement ← half;
+  var cx1 ← midX + x1 + dx * diverge + randomOffset(displacement, options, gain);
+  var cy1 ← midY + y1 + dy * diverge + randomOffset(displacement, options, gain);
+  var cx2 ← midX + x1 + 2 * dx * diverge + randomOffset(displacement, options, gain);
+  var cy2 ← midY + y1 + 2 * dy * diverge + randomOffset(displacement, options, gain);
+  var endX ← x2;
+  var endY ← y2;
+  if (!options.preserveVertices) {
+    endX ← endX + randomOffset(displacement, options, gain);
+    endY ← endY + randomOffset(displacement, options, gain);
+  }
+  addOperation(ops, "C", [cx1, cy1, cx2, cy2, endX, endY]);
+}
+
+function roughLine(ops, x1, y1, x2, y2, options) {
+  singleLine(ops, x1, y1, x2, y2, options, Ø);
+  if (!options.disableMultiStroke) singleLine(ops, x1, y1, x2, y2, options, true);
+}
+
+function roughPoints(ops, points, closed, options) {
+  var count ← points.length;
+  var i ← 1;
+  while (i < count) {
+    roughLine(ops, points[i - 1][0], points[i - 1][1], points[i][0], points[i][1], options);
+    i ← i + 1;
+  }
+  if (closed && count > 2) {
+    roughLine(ops, points[count - 1][0], points[count - 1][1], points[0][0], points[0][1], options);
+  }
+}
+
+function encodeNumber(value) { return stringifyJson(value); }
+
+function encodedOperations(ops) {
+  var result ← "";
+  var i ← 0;
+  while (i < ops.length) {
+    var command ← ops[i];
+    var line ← command.op;
+    var j ← 0;
+    while (j < command.data.length) {
+      line ← line + " " + encodeNumber(command.data[j]);
+      j ← j + 1;
+    }
+    result ← result + line + "\n";
+    i ← i + 1;
+  }
+  return result;
+}
+
+function drawScene(scene) {
+  var ops ← [];
+  var shapes ← scene.shapes;
+  var i ← 0;
+  while (i < shapes.length) {
+    var shape ← shapes[i];
+    var options ← optionsFor(scene, shape);
+    if (options.seed < 1 || options.seed >= 2147483648) {
+      console.log("seed must be an integer from 1 to 2147483647");
+      exit(2);
+    }
+    var color ← selected(shape, "color", [0, 0, 0]);
+    addOperation(ops, "P", color);
+    if (shape.type ≟ "line") {
+      roughLine(ops, shape.x1, shape.y1, shape.x2, shape.y2, options);
+    } else {
+      if (shape.type ≟ "rectangle") {
+        var x ← shape.x;
+        var y ← shape.y;
+        var w ← shape.width;
+        var h ← shape.height;
+        roughPoints(ops, [[x, y], [x + w, y], [x + w, y + h], [x, y + h]], true, options);
+      } else {
+        if (shape.type ≟ "polyline") roughPoints(ops, shape.points, Ø, options);
+        else {
+          if (shape.type ≟ "polygon") roughPoints(ops, shape.points, true, options);
+          else {
+            console.log("unsupported shape: " + shape.type);
+            exit(2);
+          }
+        }
+      }
+    }
+    i ← i + 1;
+  }
+  return encodedOperations(ops);
+}
+
+var argv ← arguments();
+if (argv.length < 2) {
+  console.log("usage: fieldmouse src/rough.fm scene.json geometry.ops");
+  exit(2);
+}
+var scene ← parseJson(readText(argv[0]));
+writeText(argv[1], drawScene(scene));
