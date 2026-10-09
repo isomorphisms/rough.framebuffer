@@ -58,3 +58,11 @@ Geometry for strokes is adapted from `src/renderer.ts` and seeded randomness
 from `src/math.ts` in [Rough.js](https://github.com/rough-stuff/rough)
 commit `56a2762171b1294d643501e8d14f120db6b27bd7` (Preet Shihn, MIT).
 The upstream notice is retained in `LICENSE-ROUGHJS`.
+
+## Reference code
+
+[`reference-code/processingjs/`](reference-code/processingjs/) preserves the
+original source from archived [Processing.js v1.6.6](https://github.com/processing-js/processing-js/tree/v1.6.6),
+including its license and authors. It is read-only comparison material for drawing,
+transforms, shapes, parsing, and touch/mouse input, **not a build or runtime
+requirement** of the Field Mouse/C framebuffer pipeline.
