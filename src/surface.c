@@ -118,7 +118,8 @@ static unsigned color_byte(double base, double illumination) {
     return (unsigned)value;
 }
 
-static int emit_face(FILE *output, const point3 camera[3], double u, double v,
+static int emit_face(FILE *output, rough_framebuffer *target,
+                     const point3 camera[3], double u, double v,
                      unsigned width, unsigned height) {
     point3 normal = cross(difference(camera[1], camera[0]),
                           difference(camera[2], camera[0]));
@@ -152,20 +153,33 @@ static int emit_face(FILE *output, const point3 camera[3], double u, double v,
                       (b.y - a.y) * (c.x - a.x);
         if (!isfinite(area)) return -1;
         if (fabs(area) <= 1e-10) continue;
-        if (fprintf(output,
-                    "P %u %u %u\n"
-                    "T %.17g %.17g %.17g %.17g %.17g %.17g %.17g %.17g %.17g\n",
-                    red, green, blue,
-                    a.x, a.y, a.depth,
-                    b.x, b.y, b.depth,
-                    c.x, c.y, c.depth) < 0) return -1;
+        if (output) {
+            if (fprintf(output,
+                        "P %u %u %u\n"
+                        "T %.17g %.17g %.17g %.17g %.17g %.17g %.17g %.17g %.17g\n",
+                        red, green, blue,
+                        a.x, a.y, a.depth,
+                        b.x, b.y, b.depth,
+                        c.x, c.y, c.depth) < 0) return -1;
+        } else {
+            rough_vertex v0 = {a.x, a.y, a.depth};
+            rough_vertex v1 = {b.x, b.y, b.depth};
+            rough_vertex v2 = {c.x, c.y, c.depth};
+            uint32_t color = 0xff000000u | ((uint32_t)red << 16) |
+                             ((uint32_t)green << 8) | (uint32_t)blue;
+            if (rough_fill_triangle(target, v0, v1, v2, color, 1.0))
+                return -1;
+        }
     }
     return 0;
 }
 
-int rough_emit_surface(FILE *output, rough_surface_shape shape, double degrees,
-                       unsigned width, unsigned height, double camera_distance) {
-    if (!output || (shape != ROUGH_SURFACE_TORUS && shape != ROUGH_SURFACE_ENNEPER) ||
+static int walk_surface(FILE *output, rough_framebuffer *target,
+                        rough_surface_shape shape, double degrees,
+                        unsigned width, unsigned height, double camera_distance) {
+    if ((!output && (!target || !target->pixels || target->width != width ||
+                      target->height != height)) ||
+        (shape != ROUGH_SURFACE_TORUS && shape != ROUGH_SURFACE_ENNEPER) ||
         !isfinite(degrees) || !isfinite(camera_distance) ||
         !(camera_distance > 0.0) || camera_distance > 100.0 ||
         !width || !height ||
@@ -205,9 +219,22 @@ int rough_emit_surface(FILE *output, rough_surface_shape shape, double degrees,
             };
             point3 first[3] = {corners[0], corners[1], corners[2]};
             point3 second[3] = {corners[0], corners[2], corners[3]};
-            if (emit_face(output, first, middle_u, middle_v, width, height) ||
-                emit_face(output, second, middle_u, middle_v, width, height)) return -1;
+            if (emit_face(output, target, first, middle_u, middle_v, width, height) ||
+                emit_face(output, target, second, middle_u, middle_v, width, height)) return -1;
         }
     }
-    return ferror(output) ? -1 : 0;
+    return output && ferror(output) ? -1 : 0;
+}
+
+int rough_emit_surface(FILE *output, rough_surface_shape shape, double degrees,
+                       unsigned width, unsigned height, double camera_distance) {
+    if (!output) return -1;
+    return walk_surface(output, NULL, shape, degrees, width, height, camera_distance);
+}
+
+int rough_draw_surface(rough_framebuffer *target, rough_surface_shape shape,
+                       double degrees, double camera_distance) {
+    if (!target || !target->pixels) return -1;
+    return walk_surface(NULL, target, shape, degrees,
+                        target->width, target->height, camera_distance);
 }
