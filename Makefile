@@ -21,9 +21,14 @@ build/test-surface: tests/test_surface.c src/surface.c src/surface.h src/framebu
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc tests/test_surface.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb build/rough-surface build/test-api build/test-surface
+build/test-touch: tests/test_touch.c src/touch.c src/touch.h src/surface.c src/surface.h src/framebuffer.c src/framebuffer.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc tests/test_touch.c src/touch.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
+
+test: build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch
 	./build/test-api
 	./build/test-surface
+	./build/test-touch
 	python3 tests/test_raster.py build/rough-fb
 
 test-fieldmouse: build/rough-fb
