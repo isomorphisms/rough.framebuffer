@@ -34,9 +34,3 @@ jobs:
           ./build/rough-surface enneper 25 160 160 > build/enneper-25.ops
           ./build/rough-fb build/enneper-25.ops build/enneper-25.ppm 160 160
           sha256sum build/torus-40.ops build/torus-40.ppm build/enneper-25.ops build/enneper-25.ppm
-          printf 'BEGIN_TORUS_40_PPM\n'
-          base64 -w 76 build/torus-40.ppm
-          printf 'END_TORUS_40_PPM\n'
-          printf 'BEGIN_ENNEPER_25_PPM\n'
-          base64 -w 76 build/enneper-25.ppm
-          printf 'END_ENNEPER_25_PPM\n'
