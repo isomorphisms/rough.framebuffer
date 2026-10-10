@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -22,20 +23,43 @@ int main(int argc, char **argv) {
         return 2;
     }
     size_t count = (size_t)width * height;
-    if (count > SIZE_MAX / sizeof(uint32_t)) return 2;
+    if (count > SIZE_MAX / sizeof(uint32_t) || count > SIZE_MAX / sizeof(float)) return 2;
     uint32_t *pixels = malloc(count * sizeof *pixels);
-    if (!pixels) return 1;
-    for (size_t i = 0; i < count; ++i) pixels[i] = 0xffffffffu;
+    float *depth = malloc(count * sizeof *depth);
+    if (!pixels || !depth) {
+        free(depth);
+        free(pixels);
+        return 1;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        pixels[i] = 0xffffffffu;
+        depth[i] = INFINITY;
+    }
 
     FILE *input = fopen(argv[1], "rb");
-    if (!input) { perror("open operations"); free(pixels); return 1; }
-    rough_framebuffer fb = {pixels, width, height, width};
+    if (!input) {
+        perror("open operations");
+        free(depth);
+        free(pixels);
+        return 1;
+    }
+    rough_framebuffer fb = {pixels, width, height, width, depth, width};
     int status = rough_render_stream(input, &fb);
     fclose(input);
-    if (status) { fprintf(stderr, "invalid geometry stream (%d)\n", status); free(pixels); return 1; }
+    if (status) {
+        fprintf(stderr, "invalid geometry stream (%d)\n", status);
+        free(depth);
+        free(pixels);
+        return 1;
+    }
 
     FILE *output = fopen(argv[2], "wb");
-    if (!output) { perror("open output"); free(pixels); return 1; }
+    if (!output) {
+        perror("open output");
+        free(depth);
+        free(pixels);
+        return 1;
+    }
     int failed = fprintf(output, "P6\n%u %u\n255\n", width, height) < 0;
     for (size_t i = 0; i < count && !failed; ++i) {
         unsigned char rgb[3] = {(unsigned char)(pixels[i] >> 16),
@@ -43,7 +67,11 @@ int main(int argc, char **argv) {
         if (fwrite(rgb, 1, 3, output) != 3) failed = 1;
     }
     if (fclose(output)) failed = 1;
+    free(depth);
     free(pixels);
-    if (failed) { fprintf(stderr, "could not write PPM\n"); return 1; }
+    if (failed) {
+        fprintf(stderr, "could not write PPM\n");
+        return 1;
+    }
     return 0;
 }

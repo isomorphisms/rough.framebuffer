@@ -4,17 +4,19 @@ A direct-framebuffer adaptation of [Rough.js](https://github.com/rough-stuff/rou
 
 This is intended to be a **Field Mouse translation of the drawing algorithms**, not
 an embedded copy of Rough.js and not a Canvas/SVG wrapper. Field Mouse emits
-geometry commands; a small C renderer writes them into a caller-owned 32-bit pixel
-buffer. The CLI writes PPM only as a portable inspection format, not as an
-intermediate rendering dependency.
+geometry commands; a small C renderer writes them into caller-owned color and
+optional depth buffers. The CLI writes PPM only as a portable inspection format,
+not as an intermediate rendering dependency.
 
 The geometry slice implements seeded, bowed double-stroke **lines, polylines,
-polygons and rectangles**. The native renderer now treats those operations as
+polygons and rectangles**. The native renderer treats those operations as
 continuous strokes rather than integer pixel walks: it provides coverage
 antialiasing, straight-alpha source-over composition, round caps, linearly tapered
-widths, and adaptive cubic subdivision. It does not yet implement ellipses, SVG
-paths, filled shapes, hachures, textured brushes, joins as an independently
-selectable style, triangles, or a depth buffer.
+widths, and adaptive cubic subdivision. It also fills flat-color screen-space
+triangles with barycentric depth interpolation and a half-open shared-edge rule.
+It does not yet implement ellipses, SVG paths, hachures, textured brushes, joins as
+an independently selectable style, antialiased triangle edges, perspective-correct
+attributes, a camera, or mesh clipping.
 
 ## Build and run
 
@@ -29,28 +31,31 @@ fieldmouse src/rough.fm fixtures/scene.json scene.ops
 not Node and not a JavaScript transpiler. `make` builds only the C renderer; it
 does not secretly substitute Node if Field Mouse is unavailable.
 
-`make test` verifies clipping, strict parsing, coverage antialiasing, alpha
-composition, tapered widths, and adaptive cubic rasterization. `FIELD_MOUSE=/path/to/fieldmouse
-make test-fieldmouse` exercises the actual Field Mouse executor, including
-repeated seeded output. The Python numeric oracle in `test-fieldmouse` checks the
-initial geometry against pinned Rough.js math; it does not replace Field Mouse
-execution.
+`make test` verifies clipping, strict parsing, stroke coverage, alpha composition,
+tapered widths, adaptive cubic rasterization, triangle edge ownership, winding,
+depth testing, and interpolated depth. `FIELD_MOUSE=/path/to/fieldmouse make
+test-fieldmouse` exercises the actual Field Mouse executor, including repeated
+seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial
+geometry against pinned Rough.js math; it does not replace Field Mouse execution.
 
-For a direct renderer example that does not require Field Mouse:
+Direct renderer examples that do not require Field Mouse:
 
 ```sh
 ./build/rough-fb fixtures/coverage.ops coverage.ppm 200 160
+./build/rough-fb fixtures/triangles.ops triangles.ppm 210 170
 ```
 
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
-`disableMultiStroke`, and `color` (an RGB triplet). Supported types: `line`,
-`rectangle`, `polyline`, `polygon`.
+`disableMultiStroke`, and `color` (an RGB triplet). Supported Field Mouse shape
+types remain `line`, `rectangle`, `polyline`, and `polygon`; triangle operations
+currently enter at the native stream or C API layer.
 
 ## Operation stream
 
-One command occupies one line. Coordinates and widths are floating-point values;
-colors remain integer RGB values. Defaults are black, opacity `1`, and width `1`.
+One command occupies one line. Coordinates, depths, and widths are floating-point
+values; colors remain integer RGB values. Defaults are black, opacity `1`, and
+width `1`.
 
 ```text
 P red green blue
@@ -59,16 +64,39 @@ W width
 M x y
 L x y [endWidth]
 C control1X control1Y control2X control2Y endX endY [endWidth]
+T x0 y0 depth0 x1 y1 depth1 x2 y2 depth2
 ```
 
 `A` accepts opacity from `0` through `1`. `W` requires a positive width. When the
 optional final width is present on `L` or `C`, width varies linearly across that
 operation and the final value becomes the current width for the next operation.
-Old `P/M/L/C` streams remain valid.
+`T` fills one triangle using the current color and opacity. It does not alter the
+current pen position or stroke width. Old `P/M/L/C` streams remain valid.
 
 Pixel centers use integer coordinates. A width-one horizontal stroke at `y = 2`
 therefore fully covers row 2, preserving the original stream-to-pixel convention;
-non-axis-aligned edges receive fractional coverage.
+non-axis-aligned stroke edges receive fractional coverage. Triangle interiors use
+pixel-center sampling and a top-left half-open rule, so two consistently specified
+faces sharing an edge neither crack nor double-own a sample.
+
+## Color and depth surfaces
+
+The public `rough_framebuffer` contains an allocated, straight-alpha `0xAARRGGBB`
+color surface with explicit width, height, and stride. Its optional `float` depth
+surface is also caller-owned and has its own stride. Smaller depth values are
+nearer; callers should clear the active depth region to `INFINITY` before a frame.
+If the depth pointer is `NULL`, triangles use submission order without depth
+testing. `rough_fill_triangle` exposes the same primitive directly without a text
+stream.
+
+Depth varies linearly in screen space across a triangle. A passing fragment writes
+depth and then blends its color. Partly translucent triangles therefore still
+occlude later geometry; order-independent transparency is outside this slice.
+Strokes do not currently read or write depth.
+
+The native caller can own an Android surface or a mapped framebuffer; the library
+itself does not open `/dev/fb0` and does not claim Android packaging or touch
+integration. The renderer allocates no internal image-sized storage.
 
 ## Pipeline
 
@@ -76,17 +104,11 @@ non-axis-aligned edges receive fractional coverage.
 JSON scene -> Field Mouse geometry -> operation stream
                                         |
                                         v
-                             native software pixel buffer
+                       native color buffer + optional depth
                                         |
                                         v
                               PPM (optional fixture)
 ```
-
-The renderer's public `rough_render_stream` API accepts an allocated, straight-alpha
-`0xAARRGGBB` pixel surface and explicit width, height, and stride. Its native caller
-can own an Android surface or a mapped framebuffer; the library itself does not
-open `/dev/fb0` and does not claim Android packaging or touch integration. The
-renderer allocates no internal image-sized storage.
 
 ## Provenance
 

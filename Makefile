@@ -9,7 +9,12 @@ build/rough-fb: src/main.c src/framebuffer.c src/framebuffer.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) src/main.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb
+build/test-api: tests/test_api.c src/framebuffer.c src/framebuffer.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc tests/test_api.c src/framebuffer.c -o $@ $(LDLIBS)
+
+test: build/rough-fb build/test-api
+	./build/test-api
 	python3 tests/test_raster.py build/rough-fb
 
 test-fieldmouse: build/rough-fb
