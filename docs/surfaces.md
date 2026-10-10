@@ -28,6 +28,20 @@ The `rough-fb` invocation is the existing portable PPM inspection path. A
 native Android framebuffer consumer would use the exact same stream/triangle
 rasterization, but no Android display, touch, or APK is added here.
 
+## Actual rendered previews
+
+Both previews below were produced from the framebuffer's real C pipeline,
+not drawn as stand-ins. The source for these frames was
+`3e46dce4afc8b7095bcc66cac54c241146392fd9`, validated in
+[hosted run 38083821284](https://github.com/isomorphisms/rough.framebuffer/actions/runs/38083821284).
+The PPM files were converted to lossless RGB PNGs for ordinary browser display.
+
+![Rotated torus at 40 degrees](../fixtures/previews/torus-40.png)
+
+![Enneper minimal surface at 25 degrees](../fixtures/previews/enneper-25.png)
+
+Source PPM SHA-256 digests: torus `1a6d0879163672fc48825fcc7a443faa30877be32c962d6aa11f3dd2f25c0653`,
+Enneper `f4af2252e9471d76df0fc5b1a5fd922424cc301a089d01b8dad90162f5abe7da`.
 ## Geometry and shading contract
 
 - **Torus:** parameters \(u,v\) are periodic, with
