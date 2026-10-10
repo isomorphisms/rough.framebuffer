@@ -6,11 +6,21 @@
 # host. APK packaging/signing is a separate reviewed stage, not this target.
 NDK_ROOT ?= $(ANDROID_NDK_HOME)
 ANDROID_API ?= 21
+ANDROID_ABI ?= armeabi-v7a
+ifeq ($(ANDROID_ABI),armeabi-v7a)
+ANDROID_TARGET := armv7a-linux-androideabi
+ANDROID_LINK_ALIGNMENT :=
+else ifeq ($(ANDROID_ABI),x86_64)
+ANDROID_TARGET := x86_64-linux-android
+ANDROID_LINK_ALIGNMENT := -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
+else
+$(error Unsupported Android ABI $(ANDROID_ABI); supported: armeabi-v7a, x86_64)
+endif
 NDK_TOOLCHAIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/linux-x86_64/bin
-ANDROID_CC := $(NDK_TOOLCHAIN)/armv7a-linux-androideabi$(ANDROID_API)-clang
+ANDROID_CC := $(NDK_TOOLCHAIN)/$(ANDROID_TARGET)$(ANDROID_API)-clang
 ANDROID_READELF := $(NDK_TOOLCHAIN)/llvm-readelf
 GLUE_DIR := $(NDK_ROOT)/sources/android/native_app_glue
-BUILD_DIR := ../build/android/armeabi-v7a
+BUILD_DIR := ../build/android/$(ANDROID_ABI)
 ANDROID_LIB := $(BUILD_DIR)/libroughart.so
 
 .PHONY: all check-ndk elf-report clean
@@ -31,7 +41,7 @@ $(ANDROID_LIB): ../android/native/rough_android.c ../src/touch.c ../src/touch.h 
 	    -isystem $(GLUE_DIR) -I../src -I../android/native \
 	    ../android/native/rough_android.c ../src/touch.c ../src/surface.c ../src/framebuffer.c \
 	    $(BUILD_DIR)/android_native_app_glue.o \
-	    -Wl,--no-undefined -Wl,-soname,libroughart.so \
+	    -Wl,--no-undefined -Wl,-soname,libroughart.so $(ANDROID_LINK_ALIGNMENT) \
 	    -landroid -llog -lm -o $@
 
 elf-report: $(ANDROID_LIB)
