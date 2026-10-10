@@ -9,9 +9,9 @@ build/rough-fb: src/main.c src/framebuffer.c src/framebuffer.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) src/main.c src/framebuffer.c -o $@ $(LDLIBS)
 
-build/rough-surface: src/surface_main.c src/surface.c src/surface.h
+build/rough-surface: src/surface_main.c src/surface.c src/surface.h src/framebuffer.c src/framebuffer.h
 	@mkdir -p build
-	$(CC) $(CFLAGS) src/surface_main.c src/surface.c -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) src/surface_main.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
 
 build/test-api: tests/test_api.c src/framebuffer.c src/framebuffer.h
 	@mkdir -p build
