@@ -1,0 +1,73 @@
+name: Native Android ARMv7 framebuffer adapter
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  armv7-native-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact proposed source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Identify build host and existing Android SDK
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "${ANDROID_HOME:-}"
+          command -v java
+          command -v sdkmanager
+          java -version
+          echo "host=$(uname -sm)"
+          git rev-parse HEAD
+      - name: Resolve exact Android NDK toolchain
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdkmanager 'ndk;29.0.14206865'
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          test -x "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang"
+          test -f "$ndk/source.properties"
+          cat "$ndk/source.properties"
+          "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang" --version
+      - name: Crosscompile actual NativeActivity and inspect ELF32 ARM target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_API=21
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          lib=build/android/armeabi-v7a/libroughart.so
+          test -s "$lib"
+          "$readelf" -h "$lib" > build/android/roughart.elf-header.txt
+          "$readelf" -d "$lib" > build/android/roughart.dynamic.txt
+          "$readelf" -Ws "$lib" > build/android/roughart.symbols.txt
+          grep -Eq 'Class: *ELF32' build/android/roughart.elf-header.txt
+          grep -Eq 'Machine: *ARM' build/android/roughart.elf-header.txt
+          grep -q 'ANativeActivity_onCreate' build/android/roughart.symbols.txt
+          grep -q 'android_main' build/android/roughart.symbols.txt
+          grep -q 'libandroid.so' build/android/roughart.dynamic.txt
+          grep -q 'liblog.so' build/android/roughart.dynamic.txt
+          sha256sum "$lib" > build/android/roughart.sha256
+          cat build/android/roughart.elf-header.txt
+          cat build/android/roughart.sha256
+      - name: Preserve host-independent input, ABI and candidate receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rough-framebuffer-a32-native-only-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/android/armeabi-v7a/libroughart.so
+            build/android/roughart.elf-header.txt
+            build/android/roughart.dynamic.txt
+            build/android/roughart.symbols.txt
+            build/android/roughart.sha256
+          if-no-files-found: error
