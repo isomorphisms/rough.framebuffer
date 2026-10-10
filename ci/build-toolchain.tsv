@@ -1,0 +1,2 @@
+# build_id	target	toolchain	ick_revision	ick_status	ick_evidence
+roughart-arm32-nativeactivity	armeabi-v7a-api21-a32	ndk	c61e448251744a2f40ad743ebef1a027bdcd2f9d	gap:ICK-A32-BetterC-does-not-qualify-Android-NativeActivity-C-lifecycle-and-full-rasterizer-closure	https://github.com/dilapidated-shed/ick/pull/59
