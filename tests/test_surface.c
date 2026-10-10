@@ -67,6 +67,30 @@ static int equal_streams(FILE *left, FILE *right) {
     }
 }
 
+/* This oracle comes from the torus equations at u=v=0, not by reusing
+ * the generator's transformation or projection functions. It catches
+ * swapped camera axes, a wrong depth sign, or a mismatched focal length. */
+static void reference_torus_vertex(FILE *stream) {
+    char line[512];
+    double values[9];
+    char surplus;
+    rewind(stream);
+    assert(fgets(line, sizeof line, stream));
+    assert(line[0] == 'P');
+    assert(fgets(line, sizeof line, stream));
+    assert(sscanf(line, "T %lf %lf %lf %lf %lf %lf %lf %lf %lf %c",
+                  &values[0], &values[1], &values[2],
+                  &values[3], &values[4], &values[5],
+                  &values[6], &values[7], &values[8], &surplus) == 9);
+    double expected_x = 159.5 + (0.88 * 240.0) * 1.61 / 5.2;
+    double expected_y = 119.5;
+    double expected_depth = 1.0 - 0.5 / 5.2;
+    assert(fabs(values[0] - expected_x) < 1e-10);
+    assert(fabs(values[1] - expected_y) < 1e-10);
+    assert(fabs(values[2] - expected_depth) < 1e-12);
+    rewind(stream);
+}
+
 static uint64_t render_checksum(FILE *stream) {
     const unsigned width = 320u;
     const unsigned height = 240u;
@@ -112,6 +136,7 @@ int main(void) {
     assert(inspect(torus37).triangles > 100u);
     assert(inspect(enneper).triangles > 100u);
     assert(inspect(near).near_vertices > 0u);
+    reference_torus_vertex(torus0);
     assert(equal_streams(torus0, torus0_repeat));
     assert(!equal_streams(torus0, torus37));
 
