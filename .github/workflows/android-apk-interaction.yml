@@ -145,11 +145,7 @@ jobs:
             adb exec-out screencap -p > build/android/emulator/after-restart.png
             adb logcat -d -s RoughFrameArt:I > build/android/emulator/native-frame-log.txt
             grep -E 'FRAME input_seq=.*painted=[1-9][0-9]*' build/android/emulator/native-frame-log.txt
-            for image in before after-drag after-tap after-restart; do
-              ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" \
-                -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' -frames:v 1 \
-                -pix_fmt rgb24 -f rawvideo "build/android/emulator/$image.rgb"
-            done
+            for image in before after-drag after-tap after-restart; do ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' -frames:v 1 -pix_fmt rgb24 -f rawvideo "build/android/emulator/$image.rgb"; done
             build/android/aici-screen-witness build/android/emulator/before.rgb build/android/emulator/after-drag.rgb
             build/android/aici-screen-witness build/android/emulator/after-drag.rgb build/android/emulator/after-tap.rgb
             build/android/aici-screen-witness build/android/emulator/after-tap.rgb build/android/emulator/after-restart.rgb
