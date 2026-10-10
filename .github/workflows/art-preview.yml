@@ -60,10 +60,20 @@ jobs:
         with:
           contract: fixtures/movie.contract.tsv
           root: build
-      - name: Expose the reviewed encoded media for a one-time materialization
+      - name: Generate updated still-frame proofs from the same native renderer
         shell: sh
         run: |
           set -eu
-          printf 'BEGIN_MATH_SURFACES_MP4\n'
-          base64 -w 76 build/math-surfaces.mp4
-          printf 'END_MATH_SURFACES_MP4\n'
+          ./build/rough-surface torus 40 160 160 > build/torus-40.ops
+          ./build/rough-fb build/torus-40.ops build/torus-40.ppm 160 160
+          ./build/rough-surface enneper 25 160 160 > build/enneper-25.ops
+          ./build/rough-fb build/enneper-25.ops build/enneper-25.ppm 160 160
+          ffmpeg -hide_banner -loglevel error -y -i build/torus-40.ppm -frames:v 1 build/torus-40.png
+          ffmpeg -hide_banner -loglevel error -y -i build/enneper-25.ppm -frames:v 1 build/enneper-25.png
+          sha256sum build/torus-40.ops build/torus-40.ppm build/torus-40.png build/enneper-25.ops build/enneper-25.ppm build/enneper-25.png
+          printf 'BEGIN_NEW_TORUS_PNG\n'
+          base64 -w 76 build/torus-40.png
+          printf 'END_NEW_TORUS_PNG\n'
+          printf 'BEGIN_NEW_ENNEPER_PNG\n'
+          base64 -w 76 build/enneper-25.png
+          printf 'END_NEW_ENNEPER_PNG\n'
