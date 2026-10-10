@@ -1,0 +1,69 @@
+name: Render two-surface framebuffer movie
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  native-movie:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source revision
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install explicit off-device video packager
+        shell: sh
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+      - name: Build native surface source and framebuffer consumer
+        shell: sh
+        run: |
+          set -eu
+          make build/rough-surface build/rough-fb
+      - name: Render 24 real framebuffer frames for each surface
+        shell: sh
+        run: |
+          set -eu
+          mkdir -p build/movie
+          frame=0
+          while test "$frame" -lt 24; do
+            angle=$((frame * 15))
+            index=$(printf '%02d' "$frame")
+            for shape in torus enneper; do
+              ./build/rough-surface "$shape" "$angle" 160 160 > "build/movie/$shape-$index.ops"
+              ./build/rough-fb "build/movie/$shape-$index.ops" "build/movie/$shape-$index.ppm" 160 160
+            done
+            frame=$((frame + 1))
+          done
+      - name: Encode H.264 with frame-provenance hashes
+        shell: sh
+        run: |
+          set -eu
+          ffmpeg -hide_banner -loglevel error -y \
+            -framerate 12 -start_number 0 -i build/movie/torus-%02d.ppm \
+            -framerate 12 -start_number 0 -i build/movie/enneper-%02d.ppm \
+            -filter_complex '[0:v][1:v]hstack=inputs=2[v]' \
+            -map '[v]' -frames:v 24 -r 12 \
+            -c:v libx264 -preset veryfast -crf 20 -profile:v baseline \
+            -pix_fmt yuv420p -movflags +faststart build/math-surfaces.mp4
+          sha256sum build/movie/torus-00.ops build/movie/torus-12.ops build/movie/enneper-00.ops build/movie/enneper-12.ops build/math-surfaces.mp4
+      - name: Independent finished-video decoder and per-panel motion
+        uses: isomorphisms/ai-ci/video@3d174000649f9f828c29e6be981cfd0e60646014
+        with:
+          contract: fixtures/movie.contract.tsv
+          root: build
+      - name: Expose the reviewed encoded media for a one-time materialization
+        shell: sh
+        run: |
+          set -eu
+          printf 'BEGIN_MATH_SURFACES_MP4\n'
+          base64 -w 76 build/math-surfaces.mp4
+          printf 'END_MATH_SURFACES_MP4\n'
