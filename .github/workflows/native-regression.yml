@@ -2,6 +2,7 @@ name: Native framebuffer regression
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, edited]
   push:
     branches: [main]
   workflow_dispatch:
@@ -24,3 +25,21 @@ jobs:
         run: |
           set -eu
           make clean test CC=${{ matrix.compiler }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
+      - name: Render inspectable frames
+        if: matrix.compiler == 'gcc'
+        run: |
+          set -eu
+          command -v ffmpeg
+          ./build/rough-surface torus 40 240 240 > build/torus-40.ops
+          ./build/rough-fb build/torus-40.ops build/torus-40.ppm 240 240
+          ./build/rough-surface enneper 25 240 240 > build/enneper-25.ops
+          ./build/rough-fb build/enneper-25.ops build/enneper-25.ppm 240 240
+          ffmpeg -hide_banner -loglevel error -y -i build/torus-40.ppm -frames:v 1 build/torus-40.png
+          ffmpeg -hide_banner -loglevel error -y -i build/enneper-25.ppm -frames:v 1 build/enneper-25.png
+          sha256sum build/torus-40.ops build/torus-40.png build/enneper-25.ops build/enneper-25.png
+          printf 'BEGIN_TORUS_40_PNG\n'
+          base64 -w 0 build/torus-40.png
+          printf '\nEND_TORUS_40_PNG\n'
+          printf 'BEGIN_ENNEPER_25_PNG\n'
+          base64 -w 0 build/enneper-25.png
+          printf '\nEND_ENNEPER_25_PNG\n'
