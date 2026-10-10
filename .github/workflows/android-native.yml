@@ -64,6 +64,26 @@ jobs:
           sha256sum "$lib" > build/android/roughart.sha256
           cat build/android/roughart.elf-header.txt
           cat build/android/roughart.sha256
+      - name: Crosscompile x86_64 emulator follower and inspect native ABI
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=x86_64 ANDROID_API=21
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          lib=build/android/x86_64/libroughart.so
+          test -s "$lib"
+          "$readelf" -h "$lib" > build/android/roughart-emulator.elf-header.txt
+          "$readelf" -d "$lib" > build/android/roughart-emulator.dynamic.txt
+          "$readelf" -Ws "$lib" > build/android/roughart-emulator.symbols.txt
+          grep -Eq 'Class: *ELF64' build/android/roughart-emulator.elf-header.txt
+          grep -Eq 'Machine: .*X86-64' build/android/roughart-emulator.elf-header.txt
+          grep -q 'ANativeActivity_onCreate' build/android/roughart-emulator.symbols.txt
+          grep -q 'android_main' build/android/roughart-emulator.symbols.txt
+          grep -q 'libandroid.so' build/android/roughart-emulator.dynamic.txt
+          sha256sum "$lib" > build/android/roughart-emulator.sha256
+          cat build/android/roughart-emulator.elf-header.txt
+          cat build/android/roughart-emulator.sha256
       - name: Preserve host-independent input, ABI and candidate receipts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -74,4 +94,9 @@ jobs:
             build/android/roughart.dynamic.txt
             build/android/roughart.symbols.txt
             build/android/roughart.sha256
+            build/android/x86_64/libroughart.so
+            build/android/roughart-emulator.elf-header.txt
+            build/android/roughart-emulator.dynamic.txt
+            build/android/roughart-emulator.symbols.txt
+            build/android/roughart-emulator.sha256
           if-no-files-found: error
