@@ -16,7 +16,9 @@ widths, and adaptive cubic subdivision. It also fills flat-color screen-space
 triangles with barycentric depth interpolation and a half-open shared-edge rule.
 It does not yet implement ellipses, SVG paths, hachures, textured brushes, joins as
 an independently selectable style, antialiased triangle edges, perspective-correct
-attributes, a camera, or mesh clipping.
+attributes, a general camera API, or arbitrary mesh clipping. The separate native
+surface generator provides fixed-camera projection and near clipping for two
+specific mathematical meshes.
 
 ## Build and run
 
@@ -28,12 +30,14 @@ fieldmouse src/rough.fm fixtures/scene.json scene.ops
 
 `fieldmouse` means the native Idriç-based interpreter from
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
-not Node and not a JavaScript transpiler. `make` builds only the C renderer; it
-does not secretly substitute Node if Field Mouse is unavailable.
+not Node and not a JavaScript transpiler. `make` builds the C renderer and
+an independent native mathematical surface stream generator; it does not
+secretly substitute Node if Field Mouse is unavailable.
 
 `make test` verifies clipping, strict parsing, stroke coverage, alpha composition,
 tapered widths, adaptive cubic rasterization, triangle edge ownership, winding,
-depth testing, and interpolated depth. `FIELD_MOUSE=/path/to/fieldmouse make
+depth testing, and interpolated depth, plus source-to-renderer mathematical
+surface frames and near-plane clipping. `FIELD_MOUSE=/path/to/fieldmouse make
 test-fieldmouse` exercises the actual Field Mouse executor, including repeated
 seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial
 geometry against pinned Rough.js math; it does not replace Field Mouse execution.
@@ -50,6 +54,24 @@ optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 `disableMultiStroke`, and `color` (an RGB triplet). Supported Field Mouse shape
 types remain `line`, `rectangle`, `polyline`, and `polygon`; triangle operations
 currently enter at the native stream or C API layer.
+
+## Rotating mathematical surfaces
+
+The native scene generator emits shaded triangles into the same P/T operation
+stream accepted by the existing depth-tested renderer. It supports a torus and
+Enneper's minimal surface with controllable rotation, fixed-camera projection,
+near-plane clipping, and two-sided diffuse/ambient face shading:
+
+```sh
+./build/rough-surface enneper 25 320 240 > build/enneper.ops
+./build/rough-fb build/enneper.ops build/enneper.ppm 320 240
+./build/rough-surface torus 60 320 240 > build/torus.ops
+./build/rough-fb build/torus.ops build/torus.ppm 320 240
+```
+
+This produces headless inspectable PPM frames, **not** an Android APK,
+interactive animation, or a new Field Mouse frontend. See
+[the projection, shading, input, and acceptance contract](docs/surfaces.md).
 
 ## Operation stream
 
