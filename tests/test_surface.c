@@ -91,6 +91,58 @@ static void reference_torus_vertex(FILE *stream) {
     rewind(stream);
 }
 
+/* Compare material colors on the two sides of each periodic torus seam.
+ * The generator emits two P/T faces per parametric cell at camera distance
+ * 5.2. A known-bad sin(1.3*u)/cos(1.8*v) palette violates this invariant,
+ * although the 3D geometry closes normally and all raster tests still pass. */
+static unsigned component_delta(unsigned left, unsigned right) {
+    return left > right ? left - right : right - left;
+}
+
+static void assert_torus_seam_palette(FILE *stream) {
+    unsigned rgb[56u][28u][3u];
+    char line[512];
+    rewind(stream);
+    for (unsigned i = 0; i < 56u; ++i) {
+        for (unsigned j = 0; j < 28u; ++j) {
+            for (unsigned face = 0; face < 2u; ++face) {
+                unsigned r, g, b;
+                char trailing;
+                assert(fgets(line, sizeof line, stream));
+                assert(sscanf(line, "P %u %u %u %c",
+                              &r, &g, &b, &trailing) == 3);
+                assert(fgets(line, sizeof line, stream));
+                assert(line[0] == 'T');
+                if (face == 0u) {
+                    rgb[i][j][0] = r;
+                    rgb[i][j][1] = g;
+                    rgb[i][j][2] = b;
+                }
+            }
+        }
+    }
+    assert(fgetc(stream) == EOF);
+    for (unsigned channel = 0; channel < 3u; ++channel) {
+        for (unsigned j = 0; j < 28u; ++j) {
+            unsigned delta = component_delta(rgb[0][j][channel],
+                                             rgb[55][j][channel]);
+            if (delta > 28u) {
+                fprintf(stderr, "torus seam palette jump in u: %u\n", delta);
+                abort();
+            }
+        }
+        for (unsigned i = 0; i < 56u; ++i) {
+            unsigned delta = component_delta(rgb[i][0][channel],
+                                             rgb[i][27][channel]);
+            if (delta > 28u) {
+                fprintf(stderr, "torus seam palette jump in v: %u\n", delta);
+                abort();
+            }
+        }
+    }
+    rewind(stream);
+}
+
 static uint64_t render_checksum(FILE *stream) {
     const unsigned width = 320u;
     const unsigned height = 240u;
@@ -137,6 +189,7 @@ int main(void) {
     assert(inspect(enneper).triangles > 100u);
     assert(inspect(near).near_vertices > 0u);
     reference_torus_vertex(torus0);
+    assert_torus_seam_palette(torus0);
     assert(equal_streams(torus0, torus0_repeat));
     assert(!equal_streams(torus0, torus37));
 
