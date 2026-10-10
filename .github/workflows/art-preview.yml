@@ -55,6 +55,7 @@ jobs:
             -c:v libx264 -preset veryfast -crf 20 -profile:v baseline \
             -pix_fmt yuv420p -movflags +faststart build/math-surfaces.mp4
           sha256sum build/movie/torus-00.ops build/movie/torus-12.ops build/movie/enneper-00.ops build/movie/enneper-12.ops build/math-surfaces.mp4
+          cmp build/math-surfaces.mp4 fixtures/previews/math-surfaces-rotation.mp4
       - name: Independent finished-video decoder and per-panel motion
         uses: isomorphisms/ai-ci/video@3d174000649f9f828c29e6be981cfd0e60646014
         with:
@@ -71,9 +72,5 @@ jobs:
           ffmpeg -hide_banner -loglevel error -y -i build/torus-40.ppm -frames:v 1 build/torus-40.png
           ffmpeg -hide_banner -loglevel error -y -i build/enneper-25.ppm -frames:v 1 build/enneper-25.png
           sha256sum build/torus-40.ops build/torus-40.ppm build/torus-40.png build/enneper-25.ops build/enneper-25.ppm build/enneper-25.png
-          printf 'BEGIN_NEW_TORUS_PNG\n'
-          base64 -w 76 build/torus-40.png
-          printf 'END_NEW_TORUS_PNG\n'
-          printf 'BEGIN_NEW_ENNEPER_PNG\n'
-          base64 -w 76 build/enneper-25.png
-          printf 'END_NEW_ENNEPER_PNG\n'
+          cmp build/torus-40.png fixtures/previews/torus-40.png
+          cmp build/enneper-25.png fixtures/previews/enneper-25.png
