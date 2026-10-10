@@ -1,0 +1,9 @@
+# operation	code	path	arguments...
+video_decode	FB-MOVIE-DECODE	math-surfaces.mp4
+video_dimensions	FB-MOVIE-DIMENSIONS	math-surfaces.mp4	320	160
+video_duration	FB-MOVIE-DURATION	math-surfaces.mp4	1.95	2.05
+video_fps	FB-MOVIE-FPS	math-surfaces.mp4	12	0.01
+video_audio	FB-MOVIE-NO-AUDIO	math-surfaces.mp4	absent
+video_encoding	FB-MOVIE-ENCODING	math-surfaces.mp4	h264	yuv420p
+video_frame_mae	TORUS-ANIMATES	math-surfaces.mp4	0.08	1.08	0	0	160	160	0.7	255
+video_frame_mae	ENNEPER-ANIMATES	math-surfaces.mp4	0.08	1.08	160	0	160	160	0.7	255
