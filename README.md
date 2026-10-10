@@ -69,6 +69,13 @@ near-plane clipping, and two-sided diffuse/ambient face shading:
 ./build/rough-fb build/torus.ops build/torus.ppm 320 240
 ```
 
+A [real 24-frame two-surface rotation movie](fixtures/previews/math-surfaces-rotation.mp4)
+is generated from the native renderer's PPM frames and encoded **off-device**
+as H.264, 320×160, 12 frames/second, no audio. Each half receives its own
+moving surface. The video packaging and finished-file decoder are separate
+from the C rasterization implementation; the [film acceptance contract](fixtures/movie.contract.tsv)
+requires full decoding and actual changed pixels in both panels.
+
 This produces headless inspectable PPM frames, **not** an Android APK,
 interactive animation, or a new Field Mouse frontend. See
 [the projection, shading, input, and acceptance contract](docs/surfaces.md).
