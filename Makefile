@@ -3,18 +3,27 @@ CFLAGS ?= -O2 -std=c11 -Wall -Wextra -Werror -pedantic
 LDLIBS = -lm
 
 .PHONY: all test test-fieldmouse clean
-all: build/rough-fb
+all: build/rough-fb build/rough-surface
 
 build/rough-fb: src/main.c src/framebuffer.c src/framebuffer.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) src/main.c src/framebuffer.c -o $@ $(LDLIBS)
 
+build/rough-surface: src/surface_main.c src/surface.c src/surface.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) src/surface_main.c src/surface.c -o $@ $(LDLIBS)
+
 build/test-api: tests/test_api.c src/framebuffer.c src/framebuffer.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc tests/test_api.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb build/test-api
+build/test-surface: tests/test_surface.c src/surface.c src/surface.h src/framebuffer.c src/framebuffer.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc tests/test_surface.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
+
+test: build/rough-fb build/rough-surface build/test-api build/test-surface
 	./build/test-api
+	./build/test-surface
 	python3 tests/test_raster.py build/rough-fb
 
 test-fieldmouse: build/rough-fb
