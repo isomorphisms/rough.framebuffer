@@ -1,0 +1,26 @@
+name: Native framebuffer regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  native:
+    name: ${{ matrix.compiler }} strict and sanitizer
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Strict native integration
+        run: |
+          set -eu
+          make clean test CC=${{ matrix.compiler }}
+      - name: Native ASan/UBSan regression
+        run: |
+          set -eu
+          make clean test CC=${{ matrix.compiler }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
