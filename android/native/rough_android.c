@@ -279,7 +279,6 @@ static int32_t input_event(struct android_app *app, AInputEvent *event) {
 }
 
 void android_main(struct android_app *app) {
-    app_dummy(); /* keep NDK native_app_glue linked */
     rough_android_state state = {0};
     state.app = app;
     if (rough_touch_init(&state.touch, 1u, 1u)) return;
