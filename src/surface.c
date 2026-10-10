@@ -134,8 +134,10 @@ static int emit_face(FILE *output, const point3 camera[3], double u, double v,
     double dot = normal.x * light.x + normal.y * light.y + normal.z * light.z;
     double diffuse = clamp_unit(fabs(dot) / (normal_length * light_length));
     double illumination = 0.20 + 0.80 * diffuse;
-    double warm = 0.5 + 0.5 * sin(1.3 * u);
-    double cool = 0.5 + 0.5 * cos(1.8 * v);
+    /* The torus identifies 0 with 2*pi in both parameters: integer
+     * harmonics avoid a visible color tear at either periodic seam. */
+    double warm = 0.5 + 0.5 * sin(u);
+    double cool = 0.5 + 0.5 * cos(2.0 * v);
     unsigned red = color_byte(55.0 + 165.0 * warm, illumination);
     unsigned green = color_byte(65.0 + 155.0 * cool, illumination);
     unsigned blue = color_byte(75.0 + 165.0 * (1.0 - warm), illumination);
