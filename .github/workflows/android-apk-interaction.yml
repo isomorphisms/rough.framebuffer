@@ -1,0 +1,168 @@
+name: Android test APK and real gesture pixels
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  x86-emulator-and-arm-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact framebuffer candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Checkout canonical Android-NDK packager (immutable)
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/android-NDK
+          ref: 42f04d7654d54309ec3f8787bfd2bc40730399d7
+          path: _canonical_ndk
+          persist-credentials: false
+      - name: Checkout previously established public test keystore
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphismes/wegert
+          ref: 89dcfb840cec1a66ee04c7f7404954cbd6c09839
+          path: _test_signing
+          sparse-checkout: _/build/app/wegert-debug.keystore
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Checkout proposed test-only package registry and independent signing checker
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: f21bb30fa13461c2f352a1f489a1a510bfbf6dce
+          path: _aici_test_signing
+          persist-credentials: false
+      - name: Checkout independent Android screenshot pixel oracle
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: isomorphisms/ai-ci
+          ref: 78f5220e554a59c2825639cb7e3cb544022141c9
+          path: _aici_screen_oracle
+          persist-credentials: false
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407
+        with:
+          packages: platform-tools
+      - name: Install explicit NDK/SDK build inputs and screenshot decoder
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdkmanager 'platforms;android-34' 'build-tools;36.0.0' 'ndk;29.0.14206865'
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+          command -v adb && command -v ffmpeg && command -v keytool
+      - name: Compile both actual Android native ABIs and independent pixel oracle
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=armeabi-v7a ANDROID_API=21
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=x86_64 ANDROID_API=21
+          mkdir -p build/android
+          cc -std=c17 -O2 -Wall -Wextra -Werror -pedantic _aici_screen_oracle/framebuffer/verify_android_screens.c -o build/android/aici-screen-witness
+          sha256sum build/android/{armeabi-v7a,x86_64}/libroughart.so
+      - name: Resolve signer strictly from candidate central test registry
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          registry=_aici_test_signing/android-signing/identities.tsv
+          cert=$(awk -F '\t' '$1 == "org.isomorphisms.roughframebuffer" && $2 == "test" {print $3}' "$registry")
+          [[ "$cert" =~ ^[0-9a-f]{64}$ ]] || { echo 'no single registered proposed test signer' >&2; exit 1; }
+          echo "ANDROID_EXPECTED_CERT_SHA256=$cert" >> "$GITHUB_ENV"
+          echo 'CANDIDATE_TEST_ONLY_SIGNER=present'
+      - name: Package both ABIs through the maintained no-Gradle NativeActivity packager
+        shell: bash
+        env:
+          ANDROID_PACKAGE_ID: org.isomorphisms.roughframebuffer
+          ANDROID_VERSION_CODE: '1'
+          ANDROID_VERSION_NAME: 0.1-test
+          ANDROID_MIN_SDK: '21'
+          ANDROID_TARGET_SDK: '34'
+          ANDROID_EXPECTED_LABEL: Rough Mathematical Art
+          ANDROID_BUILD_TOOLS: ${{ env.ANDROID_HOME }}/build-tools/36.0.0
+          ANDROID_KEYSTORE: ${{ github.workspace }}/_test_signing/_/build/app/wegert-debug.keystore
+          ANDROID_KEYSTORE_TYPE: PKCS12
+          ANDROID_KEY_ALIAS: wegert-debug
+          ANDROID_STORE_PASSWORD: wegert-debug
+          ANDROID_KEY_PASSWORD: wegert-debug
+          ANDROID_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -Eeuo pipefail
+          for abi in armeabi-v7a x86_64; do
+            bash _canonical_ndk/apk/build-nativeactivity-apk.sh \
+              android/AndroidManifest.xml \
+              "build/android/$abi/libroughart.so" "$abi" \
+              "build/android/roughart-$abi.apk"
+          done
+      - name: Verify finished ARMv7 APK against independent proposed test-only signer registry
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/roughart-armeabi-v7a.apk
+          lane: test
+      - name: Verify finished emulator APK against independent proposed test-only signer registry
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/roughart-x86_64.apk
+          lane: test
+      - name: Enable hosted x86_64 Android emulator KVM
+        shell: bash
+        run: sudo chmod a+rw /dev/kvm
+      - name: Require emulator input to change cropped mathematical pixels
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 34
+          target: default
+          arch: x86_64
+          profile: medium_phone
+          ram-size: 2048M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot-save -no-metrics
+          script: |
+            set -eu
+            mkdir -p build/android/emulator
+            adb install -r build/android/roughart-x86_64.apk
+            adb logcat -c
+            adb shell am start -W -n org.isomorphisms.roughframebuffer/android.app.NativeActivity
+            sleep 4
+            adb exec-out screencap -p > build/android/emulator/before.png
+            adb shell input swipe 280 580 800 580 650
+            sleep 4
+            adb exec-out screencap -p > build/android/emulator/after-drag.png
+            adb shell input tap 550 700
+            sleep 4
+            adb exec-out screencap -p > build/android/emulator/after-tap.png
+            adb shell am force-stop org.isomorphisms.roughframebuffer
+            adb shell am start -W -n org.isomorphisms.roughframebuffer/android.app.NativeActivity
+            sleep 4
+            adb exec-out screencap -p > build/android/emulator/after-restart.png
+            adb logcat -d -s RoughFrameArt:I > build/android/emulator/native-frame-log.txt
+            grep -E 'FRAME input_seq=.*painted=[1-9][0-9]*' build/android/emulator/native-frame-log.txt
+            for image in before after-drag after-tap after-restart; do
+              ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" \
+                -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' -frames:v 1 \
+                -pix_fmt rgb24 -f rawvideo "build/android/emulator/$image.rgb"
+            done
+            build/android/aici-screen-witness build/android/emulator/before.rgb build/android/emulator/after-drag.rgb
+            build/android/aici-screen-witness build/android/emulator/after-drag.rgb build/android/emulator/after-tap.rgb
+            build/android/aici-screen-witness build/android/emulator/after-tap.rgb build/android/emulator/after-restart.rgb
+            sha256sum build/android/emulator/*.png
+      - name: Retain candidate-only signed APK and real emulator frames if accepted
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: roughart-testonly-emulator-accepted-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/android/roughart-armeabi-v7a.apk
+            build/android/roughart-armeabi-v7a.receipt.tsv
+            build/android/roughart-x86_64.apk
+            build/android/roughart-x86_64.receipt.tsv
+            build/android/emulator/*.png
+            build/android/emulator/native-frame-log.txt
+          if-no-files-found: error
