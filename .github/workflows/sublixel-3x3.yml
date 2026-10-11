@@ -162,3 +162,19 @@ jobs:
           fi
           grep -q 'GNU Make is forbidden' /tmp/gnu-make.log
           echo 'Owned-toolchain missing/fallback controls: PASS'
+
+      - name: Reject stock GCC and success-only ICK impostors
+        shell: bash
+        env:
+          ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          for fake in /usr/bin/gcc /bin/true; do
+            if ICK_CC="$fake" sh sublixel/qualification/test-ick.sh > /tmp/fake-ick.log 2>&1; then
+              echo "Accepted counterfeit compiler: $fake" >&2
+              exit 1
+            fi
+            grep -Fq 'BLOCKED: compiler is not the pinned ICK installation' /tmp/fake-ick.log
+          done
+          echo 'Stock and fake ICK drivers correctly rejected'
