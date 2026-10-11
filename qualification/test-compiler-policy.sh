@@ -1,48 +1,80 @@
 #!/bin/sh
-# Negative controls: stock compilers and cached reference builds cannot stand in for ICK.
+# Negative controls for the maintained Ike -> ICK native build.
+# This script is itself a checked Ike recipe, never a GNU Make product target.
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-log=$(mktemp)
-trap 'rm -f "$log"' EXIT HUP INT TERM
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+: "${IKE_BIN:?required pinned Ike}"
+: "${IKE_SOURCE_DIR:?required pinned Ike checkout}"
+: "${IKE_EXPECTED_SHA256:?required checked Ike digest}"
+: "${ICK_CC:?required source-built ICK}"
+: "${ICK_SOURCE_DIR:?required pinned ICK checkout}"
+: "${HOST_LINKER:?required object-only linker}"
 
-for cc in gcc clang; do
-    if env -u ICK_CC -u ICK_SOURCE_DIR -u HOST_LINKER \
-        make -C "$root" all CC="$cc" >"$log" 2>&1; then
-        echo "FAIL: product target silently used $cc without ICK" >&2
+expect_block() {
+    label=$1
+    shift
+    if "$@" > "$tmp/$label.log" 2>&1; then
+        echo "FAIL: prohibited build was accepted: $label" >&2
         exit 1
     fi
-    grep -q 'ICK_CC' "$log" || {
-        echo "FAIL: product target failed for a reason other than missing ICK_CC" >&2
-        cat "$log" >&2
+}
+require_text() {
+    grep -Fq "$2" "$tmp/$1.log" || {
+        echo "FAIL: $1 did not report expected refusal: $2" >&2
+        cat "$tmp/$1.log" >&2
         exit 1
     }
+}
+require_failed_receipt() {
+    file=$1
+    test -s "$file" || { echo "FAIL: missing receipt $file" >&2; exit 1; }
+    grep -Fqx "$(printf 'schema\tike-build-v1')" "$file"
+    grep -Fqx "$(printf 'final_result\tFAIL')" "$file"
+}
 
-    if env -u ICK_CC -u ICK_SOURCE_DIR -u HOST_LINKER \
-        make -C "$root" test-sublixel CC="$cc" >"$log" 2>&1; then
-        echo "FAIL: Sublixel silently used $cc without ICK" >&2
-        exit 1
-    fi
-    grep -q 'ICK_CC' "$log" || {
-        echo "FAIL: Sublixel failure did not identify ICK_CC" >&2
-        cat "$log" >&2
-        exit 1
-    }
+# Missing or substituted orchestrator fails without compiling any project C.
+expect_block no-ike env -u IKE_BIN sh "$root/scripts/run-ike.sh" test
+require_text no-ike IKE_BIN
+expect_block wrong-ike env IKE_BIN=/usr/bin/make sh "$root/scripts/run-ike.sh" test
+require_text wrong-ike 'Unverified Ike executable hash'
+expect_block bad-ike-digest env IKE_EXPECTED_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
+    sh "$root/scripts/run-ike.sh" test
+require_text bad-ike-digest 'Unverified Ike executable hash'
+expect_block alt-recipe env IKE_RECIPE_RUNNER=/bin/sh sh "$root/scripts/run-ike.sh" test
+require_text alt-recipe 'Alternate Ike recipe runner requires independent qualification'
+: > "$tmp/used-receipt.tsv"
+expect_block reused-receipt env IKE_RECEIPT="$tmp/used-receipt.tsv" \
+    sh "$root/scripts/run-ike.sh" test
+require_text reused-receipt 'Refusing to overwrite or reuse an Ike receipt'
+
+# A cached existing build must not turn an absent/fake ICK into success.
+test -x "$root/build/rough-fb"
+expect_block no-ick env -u ICK_CC IKE_RECEIPT="$tmp/no-ick.tsv" \
+    sh "$root/scripts/run-ike.sh" test
+require_text no-ick ICK_CC
+require_failed_receipt "$tmp/no-ick.tsv"
+
+for fake in /usr/bin/gcc /bin/true; do
+    label=$(basename "$fake")
+    file="$tmp/fake-$label.tsv"
+    expect_block "fake-$label" env ICK_CC="$fake" IKE_RECEIPT="$file" \
+        sh "$root/scripts/run-ike.sh" test
+    require_text "fake-$label" 'BLOCKED: compiler is not the pinned ICK installation'
+    require_failed_receipt "$file"
 done
 
-# When a real ICK checkout is present, reject a stock or success-only wrapper
-# even if CC is also set. Neither substitute may satisfy a product build.
-if [ -n "${ICK_SOURCE_DIR-}" ] && [ -n "${HOST_LINKER-}" ]; then
-    for fake in /usr/bin/gcc /bin/true; do
-        test -x "$fake" || continue
-        if ICK_CC="$fake" make -C "$root" all CC=clang >"$log" 2>&1; then
-            echo "FAIL: product accepted counterfeit ICK_CC=$fake" >&2
-            exit 1
-        fi
-        if ICK_CC="$fake" make -C "$root" test-sublixel CC=gcc >"$log" 2>&1; then
-            echo "FAIL: Sublixel accepted counterfeit ICK_CC=$fake" >&2
-            exit 1
-        fi
-    done
-fi
+# Even if CC points at a host compiler, the product must still be compiled by
+# authenticated ICK. This is a positive real rebuild, not a string-only check.
+CC=/usr/bin/gcc IKE_RECEIPT="$tmp/cc-shadow.tsv" \
+    sh "$root/scripts/run-ike.sh" test > "$tmp/cc-shadow.log" 2>&1
+grep -Fq 'ICK-compiled Sublixel 3x3 + 5x5 and framebuffer native C11 tests: PASS' "$tmp/cc-shadow.log"
+grep -Fqx "$(printf 'final_result\tPASS')" "$tmp/cc-shadow.tsv"
 
-printf '%s\n' 'ICK-first policy negative controls: PASS (no substitute accepted)'
+# System GNU Make may exist for isolated stage-zero bootstrap, but its
+# maintained product entrypoint must fail visibly.
+expect_block gnu-make /usr/bin/make -C "$root" all
+require_text gnu-make 'GNU Make is forbidden'
+
+echo "Ike and ICK substitution/receipt/fail-closed policy controls: PASS"

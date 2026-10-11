@@ -12,42 +12,36 @@ The first slice implements seeded, bowed double-stroke **lines, polylines,
 polygons and rectangles**. It does not yet implement ellipses, SVG paths,
 filled shapes, hachures, textured brushes, or stroke-width variation.
 
+## Owned toolchains only
+
+The **authoritative build orchestrator is [Ike](https://github.com/dilapidated-shed/ike)** with its checked `Ikefile` and `ike-build-v1` receipt. Consumer C code is compiled exclusively by pinned source-built **[ICK](https://github.com/dilapidated-shed/ick)**. ICKY remains the developing parser; Ithon/ILua and other owned tools must be used only at stages they actually support.
+
+GNU Make is explicitly blocked by the top-level and Sublixel `Makefile` stubs. There is no `CC=cc`, GCC, Clang, NDK or GNU Make product fallback. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands a pinned compiled Ike, caller-supplied expected executable digest (independent verification pending) and fresh receipt path. Refer to [owned-toolchain qualification](sublixel/qualification/README.md).
+
+**Explicit stage-zero exceptions:** Building the GCC-derived ICK compiler still requires the system host C/C++ bootstrap toolchain and GNU Make; a declared system linker supplies Linux CRT/libc/libm after ICK generated the project and Ike objects. None of these stages compiles any consumer C source. This is not yet a self-hosting complete-toolchain claim.
+
 ## Build and run
 
+A pinned, qualified Ike and ICK must both be supplied (the workflow builds them from source). Example from a qualified host:
+
 ```sh
-ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \\
-ICK_SOURCE_DIR=/absolute/ick/checkout \\
-HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \\
-make
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
+HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
+IKE_BIN=/absolute/verified/ike \
+IKE_SOURCE_DIR=/absolute/pinned/ike/checkout \
+IKE_EXPECTED_SHA256="$PINNED_IKE_SHA256" \
+IKE_RECEIPT=/absolute/unused/receipt.tsv \
+sh scripts/run-ike.sh test
 fieldmouse src/rough.fm fixtures/scene.json scene.ops
 ./build/rough-fb scene.ops scene.ppm 240 200
 ```
 
 `fieldmouse` means the native Idriç-based interpreter from
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
-not Node and not a JavaScript transpiler. `make` builds only the C renderer, and its **product compiler is source-built ICK**.
-It does not silently substitute stock GCC/Clang or Node if ICK or Field Mouse is
-missing. The ICK checkout must be pinned to `c61e448251744a2f40ad743ebef1a027bdcd2f9d`
-with GCC reference submodule `6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
-The ICK driver (named `x86_64-linux-gnu-gcc` because ICK is GCC-derived) and
-its installed `cc1` are checked before **both native C source files** are compiled
-into ICK objects. `HOST_LINKER` takes only those objects and `-lm`; it does not
-compile C. Missing or mismatched ICK fails the product build, regardless of `CC`.
+not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build and native tests; it does not run Field Mouse or substitute Node for it.
 
-`make test` builds the framebuffer and both 3×3/5×5 Sublixel tests from ICK
-objects, then runs the Linux fixtures. After separately building the pinned ICK,
-use the same three environment variables shown above. For explicit comparison,
-`make test-reference REFERENCE_CC=clang CC=clang` uses **reference-only** compiler
-outputs and cannot qualify or replace the ICK lane. Native `make` is x86_64 Linux
-only; target-specific Android application builds remain unqualified for ICK.
-See [the compiler-gap matrix](qualification/compiler-gaps.tsv) and
-[the policy negatives](qualification/test-compiler-policy.sh). The matrix permits
-named NDK Clang **test candidates**, not silent promotion to ICK or release claims.
-
-`make test` verifies a C raster fixture. `FIELD_MOUSE=/path/to/fieldmouse
-make test-fieldmouse` exercises the actual Field Mouse executor, including
-repeated seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial geometry
-against pinned Rough.js math; it does not replace Field Mouse execution.
+Ike's `test` target executes ICK-compiled C tests for Sublixel and the framebuffer. The legacy Field Mouse integration and Python numerical oracle remain separate, unqualified under Ithon; neither runs automatically and neither is counted toward this owned-toolchain qualification.
 
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
