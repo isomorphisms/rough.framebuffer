@@ -39,4 +39,12 @@ int rough_draw_surface_smooth(rough_framebuffer *target,
                               rough_surface_shape shape,
                               double degrees, double camera_distance);
 
+/* Model-space analytic unit normal on the parameterized surface, independent
+ * of triangulation and the Android camera. Useful for independently testing
+ * the mathematical differential geometry and periodic seam continuity.
+ * Returns -1 for invalid inputs and writes nothing on failure.
+ */
+int rough_surface_unit_normal(rough_surface_shape shape,
+                              double u, double v, double xyz[3]);
+
 #endif
