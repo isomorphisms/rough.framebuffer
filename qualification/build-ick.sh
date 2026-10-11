@@ -8,11 +8,10 @@ root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 : "${ICK_SOURCE_DIR:?BLOCKED: ICK_SOURCE_DIR must name the pinned ICK checkout}"
 : "${HOST_LINKER:?BLOCKED: HOST_LINKER must name the object-only system linker driver}"
 
-for var in ICK_CC ICK_SOURCE_DIR HOST_LINKER; do
-    eval "value=\${$var}"
+for value in "$ICK_CC" "$ICK_SOURCE_DIR" "$HOST_LINKER"; do
     case "$value" in
         /*) ;;
-        *) echo "BLOCKED: $var must be an absolute path" >&2; exit 2 ;;
+        *) echo "BLOCKED: compiler source, driver and linker paths must be absolute" >&2; exit 2 ;;
     esac
 done
 test -x "$ICK_CC" || { echo 'BLOCKED: ICK compiler missing' >&2; exit 2; }
