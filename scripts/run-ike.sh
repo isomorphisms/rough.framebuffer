@@ -42,8 +42,8 @@ identity=sha256:$ikfilehash
     "$IKE_BIN" "$target"
 )
 
-hex_string() { printf %s "$1" | od -An -tx1 | tr -d ' \\n'; }
-tab=$(printf '\\t')
+hex_string() { printf %s "$1" | od -An -tx1 | tr -d ' \n'; }
+tab=$(printf '\t')
 case "$target" in
     all|test) expected_recipe='sh sublixel/qualification/test-ick.sh' ;;
     clean) expected_recipe='rm -rf build sublixel/build' ;;
