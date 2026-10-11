@@ -13,6 +13,7 @@ extern "C" {
  * Each pixel is sampled at 8x8 midpoint locations, 64 samples total.
  */
 #define CP_GRID3_SIDE 3
+#define CP_GRID5_SIDE 5
 #define CP_SUBPIXEL_SIDE 8
 
 typedef struct { double x, y; } cp_vec2;
@@ -30,7 +31,7 @@ typedef struct {
     cp_vec2 tangent;       /* unit tangent */
     cp_vec2 normal;        /* left unit normal = (-tangent.y,tangent.x) */
     double a2;             /* signed curvature / 2, in inverse pixels */
-    double a3;             /* reserved for 5x5; ignored in 3x3 */
+    double a3;             /* signed cubic coefficient; 3x3 ignores it */
     double half_width;     /* positive, in pixels */
     double valid_u;        /* tangent domain [-valid_u,+valid_u], pixels */
 } cp_curve_patch;
@@ -84,6 +85,55 @@ void cp_patch_accumulator_3x3_coverage(const cp_accumulator_3x3 *acc,
 /* Convenience for one patch. Does not modify out on failure. */
 cp_status cp_patch_cover_3x3(const cp_curve_patch *patch,
                              int center_x, int center_y, double out[3][3]);
+
+
+/* The 5x5 API uses cubic v(u)=a2*u^2+a3*u^3 and 8x8 midpoint
+ * samples per pixel: 25 pixels, 1600 individual sample tests.
+ * Existing 3x3 and single-pixel quadratic APIs retain their old semantics.
+ */
+typedef struct {
+    int center_x, center_y;
+    uint64_t occupied[CP_GRID5_SIDE][CP_GRID5_SIDE];
+} cp_accumulator_5x5;
+
+/* Third-order parametric jet, with derivatives all at the same parameter.
+ * For s=|D1|, A=T.D2, B=N.D2, C=N.D3:
+ * a2=B/(2*s*s), a3=(C/s^3 - 3*A*B/s^4)/6.
+ * Under curve reversal a2 changes sign, a3 does not.
+ * Output remains unchanged on failure.
+ */
+cp_status cp_patch_from_jet3(cp_curve_patch *out, cp_vec2 origin,
+                             cp_vec2 first_derivative,
+                             cp_vec2 second_derivative,
+                             cp_vec2 third_derivative,
+                             double half_width, double valid_u);
+/* Position and first THREE derivatives of a cubic Bezier at t in [0,1].
+ * The legacy cp_patch_from_cubic() intentionally computes only a 2-jet. */
+cp_status cp_patch_from_cubic_jet3(cp_curve_patch *out,
+                                  const cp_vec2 controls[4], double t,
+                                  double half_width, double valid_u);
+
+/* Cubic graph point and local normal-frame residual (NOT nearest distance).
+ * Both queries reject u outside the caller-specified tangent domain. */
+cp_status cp_patch_point_cubic(const cp_curve_patch *patch, double u,
+                               cp_vec2 *out);
+cp_status cp_patch_signed_distance_cubic(const cp_curve_patch *patch,
+                                         cp_vec2 point, double *out);
+cp_status cp_patch_coverage_pixel_cubic(const cp_curve_patch *patch,
+                                        int pixel_x, int pixel_y,
+                                        double *out);
+
+/* Row-major coverage[y][x]; center pixel is [2][2].
+ * Occupancy uses per-sample OR across patches of ONE shape.
+ * Both accumulation and the one-shot cover are atomic on errors. */
+void cp_patch_accumulator_5x5_init(cp_accumulator_5x5 *acc,
+                                   int center_x, int center_y);
+cp_status cp_patch_accumulate_5x5(cp_accumulator_5x5 *acc,
+                                  const cp_curve_patch *patch);
+void cp_patch_accumulator_5x5_coverage(const cp_accumulator_5x5 *acc,
+                                      double out[5][5]);
+cp_status cp_patch_cover_5x5(const cp_curve_patch *patch,
+                             int center_x, int center_y, double out[5][5]);
 
 #ifdef __cplusplus
 }

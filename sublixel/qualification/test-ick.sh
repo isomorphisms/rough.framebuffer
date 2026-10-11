@@ -41,6 +41,10 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/sublixel/src/curve_patch.c" -o "$out/curve_patch.o"
 "$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
     "$repo_root/sublixel/tests/test_curve_patch.c" -o "$out/test_curve_patch.o"
+"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
+    "$repo_root/sublixel/src/curve_patch_5x5.c" -o "$out/curve_patch_5x5.o"
+"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
+    "$repo_root/sublixel/tests/test_curve_patch_5x5.c" -o "$out/test_curve_patch_5x5.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/src/framebuffer.c" -o "$out/framebuffer.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
@@ -49,6 +53,7 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/tests/test_raster_ick.c" -o "$out/test_raster_ick.o"
 
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
+              "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
               "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
@@ -58,6 +63,8 @@ done
 # crt/libc/libm through an explicit system link driver; no project C compilation.
 "$HOST_LINKER" "$out/curve_patch.o" "$out/test_curve_patch.o" \
     -lm -o "$out/test_curve_patch"
+"$HOST_LINKER" "$out/curve_patch.o" "$out/curve_patch_5x5.o" \
+    "$out/test_curve_patch_5x5.o" -lm -o "$out/test_curve_patch_5x5"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/test_raster_ick.o" \
     -lm -o "$out/test_raster_ick"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/rough_main.o" \
@@ -69,8 +76,11 @@ echo "ICK cc1: $cc1"
 echo "Declared system CRT/link driver, never source compiler: $HOST_LINKER"
 sha256sum "$ICK_CC" "$cc1" "$out/curve_patch.o" \
     "$out/test_curve_patch.o" "$out/framebuffer.o" "$out/rough_main.o" \
-    "$out/test_raster_ick.o" "$out/test_curve_patch" "$out/test_raster_ick" \
+    "$out/test_raster_ick.o" "$out/curve_patch_5x5.o" \
+    "$out/test_curve_patch_5x5.o" "$out/test_curve_patch" \
+    "$out/test_curve_patch_5x5" "$out/test_raster_ick" \
     "$repo_root/build/rough-fb"
 "$out/test_curve_patch"
+"$out/test_curve_patch_5x5"
 "$out/test_raster_ick"
-echo "ICK-compiled Sublixel and framebuffer native C11 tests: PASS"
+echo "ICK-compiled Sublixel 3x3 + 5x5 and framebuffer native C11 tests: PASS"

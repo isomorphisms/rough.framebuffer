@@ -10,18 +10,19 @@ receipt and verifies the selected target, identity, runner mode and PASS
 before claiming success. Neither a PATH-shadowed GNU Make nor any unverified
 Ike-named executable can substitute. A missing owned builder must fail.
 
-All five consumer C sources compile exclusively through **source-built ICK**,
+All seven consumer C sources compile exclusively through **source-built ICK**,
 `dilapidated-shed/ick@c61e448251744a2f40ad743ebef1a027bdcd2f9d`,
 with GCC reference submodule
 `6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
 The ICK C11 compile script binds exact ICK source and **requires the driver at that checkout's staged installation path**, with `cc1` inside its staged libexec tree. Stock `/usr/bin/gcc` and success-only impostors must fail even if passed as `ICK_CC`; target triple, ELF ABI and object/executable checksums are recorded.
 
-- `sublixel/src/curve_patch.c` and `sublixel/tests/test_curve_patch.c`
+- `sublixel/src/curve_patch.c` and `sublixel/tests/test_curve_patch.c` (quadratic 3×3)
+- `sublixel/src/curve_patch_5x5.c` and `sublixel/tests/test_curve_patch_5x5.c` (cubic 5×5)
 - `src/framebuffer.c`, `src/main.c`, and `tests/test_raster_ick.c`
 
-Both native test programs run from the actual ICK-produced objects; the
+All three native test programs run from the actual ICK-produced objects; the
 framebuffer CLI is assembled from ICK objects. No direct consumer GCC/Clang
-or NDK compilation jobs remain. The two former reference runs are
+or NDK compilation jobs remain. The former GCC/Clang reference runs are
 historical only. Root and Sublixel `Makefile` are explicit GNU Make
 refusal stubs. Ike v1 owns the dependency graph without pretending to
 parse GNU Make syntax.
@@ -61,3 +62,5 @@ acceptance; Android compiler/sysroot/APK/device runtime, registered
 Flexible Pipes dispatch and independent ai-ci acceptance remain separate.
 Do not equate creation of an issue, an Ikefile, a hosted job or a PR with
 those missing gates.
+
+This stacked extension preserves 3×3 API behavior and adds the independent 5×5 cubic coverage suite under the **same** pinned Ike/ICK build. Inherited 5×5 GCC/Clang differential and GNU Make build recipes have been superseded, not preserved as alternative product paths. The 5×5 native x86_64 Linux ICK receipt cannot establish Android compilation or a device-visible antialiasing improvement.
