@@ -53,15 +53,18 @@ readelf -h "$tmp/ick-dialect.o" | grep -q 'Machine:.*Advanced Micro Devices X86-
 sha256sum "$ICK_CC" "$tmp/ick-dialect.o" "$tmp/ick-dialect"
 echo "Pinned ICK Unicode assignment/multiplication/division: PASS"
 
+# The enclosing Ike policy-check already owns its IKE_RECEIPT. Negative tests
+# need distinct never-used receipt names to reach the intended guard instead
+# of failing at the earlier 'receipt already exists' guard.
 # Missing or substituted orchestrator fails without compiling any project C.
-expect_block no-ike env -u IKE_BIN sh "$root/scripts/run-ike.sh" test
+expect_block no-ike env -u IKE_BIN IKE_RECEIPT="$tmp/no-ike-bin.tsv" sh "$root/scripts/run-ike.sh" test
 require_text no-ike IKE_BIN
-expect_block wrong-ike env IKE_BIN=/usr/bin/make sh "$root/scripts/run-ike.sh" test
+expect_block wrong-ike env IKE_BIN=/usr/bin/make IKE_RECEIPT="$tmp/wrong-ike.tsv" sh "$root/scripts/run-ike.sh" test
 require_text wrong-ike 'Unverified Ike executable hash'
 expect_block bad-ike-digest env IKE_EXPECTED_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
-    sh "$root/scripts/run-ike.sh" test
+    IKE_RECEIPT="$tmp/bad-digest.tsv" sh "$root/scripts/run-ike.sh" test
 require_text bad-ike-digest 'Unverified Ike executable hash'
-expect_block alt-recipe env IKE_RECIPE_RUNNER=/bin/sh sh "$root/scripts/run-ike.sh" test
+expect_block alt-recipe env IKE_RECIPE_RUNNER=/bin/sh IKE_RECEIPT="$tmp/alt-recipe.tsv" sh "$root/scripts/run-ike.sh" test
 require_text alt-recipe 'Alternate Ike recipe runner requires independent qualification'
 : > "$tmp/used-receipt.tsv"
 expect_block reused-receipt env IKE_RECEIPT="$tmp/used-receipt.tsv" \
