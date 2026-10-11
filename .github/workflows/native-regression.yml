@@ -41,6 +41,21 @@ jobs:
             exit 1
           fi
           grep -q 'torus seam palette jump' build/mutant.log
+      - name: Kill the human-found backwards hemisphere rotation mutant
+        if: matrix.compiler == 'gcc'
+        run: |
+          set -eu
+          sed 's/state->anchor_yaw -/state->anchor_yaw +/' src/touch.c > build/bad_backside_rotation.c
+          grep -Fq 'state->anchor_yaw +' build/bad_backside_rotation.c
+          gcc -O2 -std=c11 -Wall -Wextra -Werror -pedantic -Isrc \
+            tests/test_rotation_grab.c build/bad_backside_rotation.c \
+            src/surface.c src/framebuffer.c -lm -o build/test-backside-mutant
+          if (ulimit -c 0; ./build/test-backside-mutant > build/bad_backside.log 2>&1); then
+            echo 'BACKSIDE_ROTATION_FALSE_PASS: inverted near-side sign accepted' >&2
+            exit 1
+          fi
+          grep -Fq 'FRONT_HEMISPHERE_WRONG_DIRECTION:' build/bad_backside.log
+          echo 'BACKSIDE_ROTATION_MUTANT_KILLED: near-side grip direction enforced'
       - name: Render inspectable frames
         if: matrix.compiler == 'gcc'
         run: |

@@ -1,0 +1,131 @@
+name: Native Android A1 and C67 framebuffer ABIs
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-native-abis:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact proposed source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Establish Android SDK command-line tools (pinned action)
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools
+      - name: Identify build host and existing Android SDK
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "${ANDROID_HOME:-}"
+          command -v java
+          command -v sdkmanager
+          java -version
+          echo "host=$(uname -sm)"
+          git rev-parse HEAD
+      - name: Resolve exact Android NDK toolchain
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdkmanager 'ndk;29.0.14206865'
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          test -x "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang"
+          test -f "$ndk/source.properties"
+          cat "$ndk/source.properties"
+          "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi21-clang" --version
+      - name: Crosscompile actual NativeActivity and inspect ELF32 ARM target
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_API=21
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          lib=build/android/armeabi-v7a/libroughart.so
+          test -s "$lib"
+          "$readelf" -h "$lib" > build/android/roughart.elf-header.txt
+          "$readelf" -d "$lib" > build/android/roughart.dynamic.txt
+          "$readelf" -Ws "$lib" > build/android/roughart.symbols.txt
+          grep -Eq 'Class: *ELF32' build/android/roughart.elf-header.txt
+          grep -Eq 'Machine: *ARM' build/android/roughart.elf-header.txt
+          grep -q 'ANativeActivity_onCreate' build/android/roughart.symbols.txt
+          grep -q 'android_main' build/android/roughart.symbols.txt
+          grep -q 'libandroid.so' build/android/roughart.dynamic.txt
+          grep -q 'liblog.so' build/android/roughart.dynamic.txt
+          sha256sum "$lib" > build/android/roughart.sha256
+          cat build/android/roughart.elf-header.txt
+          cat build/android/roughart.sha256
+      - name: Crosscompile x86_64 emulator follower and inspect native ABI
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=x86_64 ANDROID_API=21
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          lib=build/android/x86_64/libroughart.so
+          test -s "$lib"
+          "$readelf" -h "$lib" > build/android/roughart-emulator.elf-header.txt
+          "$readelf" -d "$lib" > build/android/roughart-emulator.dynamic.txt
+          "$readelf" -Ws "$lib" > build/android/roughart-emulator.symbols.txt
+          grep -Eq 'Class: *ELF64' build/android/roughart-emulator.elf-header.txt
+          grep -Eq 'Machine: .*X86-64' build/android/roughart-emulator.elf-header.txt
+          grep -q 'ANativeActivity_onCreate' build/android/roughart-emulator.symbols.txt
+          grep -q 'android_main' build/android/roughart-emulator.symbols.txt
+          grep -q 'libandroid.so' build/android/roughart-emulator.dynamic.txt
+          sha256sum "$lib" > build/android/roughart-emulator.sha256
+          cat build/android/roughart-emulator.elf-header.txt
+          cat build/android/roughart-emulator.sha256
+      - name: Crosscompile C67 arm64-v8a native activity with 16 KiB LOAD alignment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          ndk="$ANDROID_HOME/ndk/29.0.14206865"
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=arm64-v8a ANDROID_API=21
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          lib=build/android/arm64-v8a/libroughart.so
+          test -s "$lib"
+          "$readelf" -h "$lib" > build/android/roughart-c67.elf-header.txt
+          "$readelf" -d "$lib" > build/android/roughart-c67.dynamic.txt
+          "$readelf" -Ws "$lib" > build/android/roughart-c67.symbols.txt
+          "$readelf" -lW "$lib" > build/android/roughart-c67.program-headers.txt
+          grep -Eq 'Class: *ELF64' build/android/roughart-c67.elf-header.txt
+          grep -Eq 'Machine: *AArch64' build/android/roughart-c67.elf-header.txt
+          grep -q 'ANativeActivity_onCreate' build/android/roughart-c67.symbols.txt
+          grep -q 'android_main' build/android/roughart-c67.symbols.txt
+          grep -q 'libandroid.so' build/android/roughart-c67.dynamic.txt
+          grep -q 'liblog.so' build/android/roughart-c67.dynamic.txt
+          awk '$1=="LOAD" {count++; if ($NF != "0x4000") exit 1} END {if (count < 1) exit 1}' build/android/roughart-c67.program-headers.txt
+          sha256sum "$lib" > build/android/roughart-c67.sha256
+          cat build/android/roughart-c67.elf-header.txt
+          cat build/android/roughart-c67.sha256
+      - name: Preserve host-independent input, ABI and candidate receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rough-framebuffer-a1-c67-native-abis-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/android/armeabi-v7a/libroughart.so
+            build/android/roughart.elf-header.txt
+            build/android/roughart.dynamic.txt
+            build/android/roughart.symbols.txt
+            build/android/roughart.sha256
+            build/android/x86_64/libroughart.so
+            build/android/roughart-emulator.elf-header.txt
+            build/android/roughart-emulator.dynamic.txt
+            build/android/roughart-emulator.symbols.txt
+            build/android/roughart-emulator.sha256
+            build/android/arm64-v8a/libroughart.so
+            build/android/roughart-c67.elf-header.txt
+            build/android/roughart-c67.dynamic.txt
+            build/android/roughart-c67.symbols.txt
+            build/android/roughart-c67.program-headers.txt
+            build/android/roughart-c67.sha256
+          if-no-files-found: error
