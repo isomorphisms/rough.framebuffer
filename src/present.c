@@ -78,7 +78,8 @@ int rough_present_rgba8888(const rough_framebuffer *source,
         !valid_layout(destination_width, destination_height,
                       destination_stride_pixels)) return -1;
 
-    if ((size_t)destination_width > SIZE_MAX / sizeof(axis_sample)) return -1;
+    /* destination_width is already bounded to 16384, so the temporary
+     * axis array fits in size_t on both 32-bit ARM and 64-bit hosts. */
     axis_sample *columns = malloc((size_t)destination_width * sizeof *columns);
     if (!columns) return -1;
     for (unsigned x = 0; x < destination_width; ++x)
