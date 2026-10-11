@@ -29,4 +29,14 @@ int rough_emit_surface(FILE *out, rough_surface_shape shape, double degrees,
 int rough_draw_surface(rough_framebuffer *target, rough_surface_shape shape,
                        double degrees, double camera_distance);
 
+/* Alternative direct rasterized surface appearance: true per-fragment
+ * diffuse lighting from perspective-correctly interpolated ANALYTIC normals.
+ * The face geometry, top-left coverage and z-buffer have the same meaning
+ * as rough_draw_surface; the legacy P/T stream remains flat-shaded.
+ * Requires a caller-owned depth buffer and does not clear either buffer.
+ */
+int rough_draw_surface_smooth(rough_framebuffer *target,
+                              rough_surface_shape shape,
+                              double degrees, double camera_distance);
+
 #endif
