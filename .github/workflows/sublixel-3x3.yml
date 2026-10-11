@@ -1,9 +1,13 @@
-name: Sublixel 3x3 ICK source compiler qualification
+name: Sublixel + framebuffer ICK-only native C11 qualification
 on:
   pull_request:
     paths:
       - 'sublixel/**'
       - 'Makefile'
+      - 'src/framebuffer.c'
+      - 'src/framebuffer.h'
+      - 'src/main.c'
+      - 'tests/test_raster_ick.c'
       - '.github/workflows/sublixel-3x3.yml'
   push:
     branches:
@@ -11,6 +15,10 @@ on:
     paths:
       - 'sublixel/**'
       - 'Makefile'
+      - 'src/framebuffer.c'
+      - 'src/framebuffer.h'
+      - 'src/main.c'
+      - 'tests/test_raster_ick.c'
       - '.github/workflows/sublixel-3x3.yml'
 
 permissions:
@@ -18,7 +26,7 @@ permissions:
 
 jobs:
   ick-native:
-    name: Source-built ICK x86_64 C11
+    name: Source-built ICK x86_64 C11 and native tests
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -43,7 +51,7 @@ jobs:
           test "$(git -C ick-toolchain/gcc rev-parse HEAD)" = '6294f1d9e7536e5ffcde09d1528c918d63abfef5'
           grep -Fxq 'gcc_commit=6294f1d9e7536e5ffcde09d1528c918d63abfef5' ick-toolchain/ick/SOURCE.lock
 
-      - name: Install explicit ICK compiler bootstrap dependencies
+      - name: Install explicit ICK stage-zero bootstrap dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential flex texinfo \
@@ -81,14 +89,14 @@ jobs:
             --disable-libquadmath \
             --disable-libssp \
             --disable-libvtv
-      - name: Build owned ICK compiler rather than compiling Sublixel with host GCC
+      - name: Build owned ICK compiler from pinned source
         shell: bash
         run: |
           set -euo pipefail
           make -C ick-toolchain/build -j2 all-gcc
           make -C ick-toolchain/build install-gcc
 
-      - name: Compile and execute all Sublixel tests from ICK objects
+      - name: Compile all framebuffer and Sublixel C sources with ICK; run native tests
         shell: bash
         env:
           ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
@@ -96,24 +104,15 @@ jobs:
           HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
         run: |
           set -euo pipefail
-          make test-sublixel
+          make test
 
-  reference:
-    name: Reference-only / ${{ matrix.cc }}
-    runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        cc: [gcc, clang]
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-      - name: Differential test (not ICK acceptance)
-        run: make test-sublixel-reference CC=${{ matrix.cc }}
-      - name: Reference sanitizers (not ICK acceptance)
+      - name: Refuse missing ICK instead of choosing the host C compiler
         shell: bash
         run: |
-          make -C sublixel clean
-          make test-sublixel-reference CC=${{ matrix.cc }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
+          set -euo pipefail
+          if env -u ICK_CC -u ICK_SOURCE_DIR -u HOST_LINKER make test > /tmp/no-ick.log 2>&1; then
+            echo "Forbidden host C compiler fallback" >&2
+            exit 1
+          fi
+          grep -q ICK_CC /tmp/no-ick.log
+          echo "Missing ICK correctly blocked"

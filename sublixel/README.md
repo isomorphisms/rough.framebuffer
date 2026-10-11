@@ -26,9 +26,10 @@ These are sampled footprint integrals, not exact analytic area, opaque 3×3 stam
 
 Header: include/sublixel/curve_patch.h. Implementation: src/curve_patch.c. No dynamic allocations; standard C11 plus libm.
 
-    make -C sublixel test
+    ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+    ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
+    HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
     make test-sublixel
-    CC=clang make -C sublixel clean test
 
 Tests cover exact 0, 1/2 and 1 coverage, independent 8×8 counts for a known parabola, quadratic and circle curvature, Bézier derivative evaluation, regular nonlinear reparameterization/reversal, grid ordering, duplicate/split patch union, invalid inputs, overflow and failure without partial output mutation.
 

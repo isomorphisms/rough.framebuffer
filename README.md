@@ -12,23 +12,49 @@ The first slice implements seeded, bowed double-stroke **lines, polylines,
 polygons and rectangles**. It does not yet implement ellipses, SVG paths,
 filled shapes, hachures, textured brushes, or stroke-width variation.
 
+## Owned toolchains only
+
+The C framebuffer renderer and Sublixel library are compiled **only by the pinned
+source-built [ICK](https://github.com/dilapidated-shed/ick) C compiler**.
+`make`, `make test`, and `make -C sublixel test` now reject missing ICK instead
+of selecting host `cc`, GCC, Clang, or an Android NDK fallback. Specify
+`ICK_CC`, `ICK_SOURCE_DIR`, and a declared link-only `HOST_LINKER` as documented
+in [Sublixel's exact toolchain contract](sublixel/qualification/README.md).
+
+The host GCC/G++ bootstrap of the not-yet-self-hosting ICK compiler and the
+system runtime/link driver are explicitly identified **stage-zero / link-only**
+dependencies; neither is allowed to compile this repository's C source.
+The prior GCC/Clang differential CI lanes have been removed. The native
+tests include an ICK-compiled framebuffer smoke test. Legacy Python test
+scripts are not part of the current acceptance run; Field Mouse integration
+requires an explicitly named Ithon and remains unqualified for that interpreter.
+
+For other languages, select only an actually supported owned toolchain
+(ICKY, IKE, Ithon, ILua, etc.). An unsupported capability blocks the build
+rather than silently substituting another implementation.
+
 ## Build and run
 
+The verified ICK environment is required; plain `make` with no compiler
+binding correctly fails closed.
+
 ```sh
-make
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
+HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
+make test
 fieldmouse src/rough.fm fixtures/scene.json scene.ops
 ./build/rough-fb scene.ops scene.ppm 240 200
 ```
 
 `fieldmouse` means the native Idriç-based interpreter from
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
-not Node and not a JavaScript transpiler. `make` builds only the C renderer; it
-does not secretly substitute Node if Field Mouse is unavailable.
+not Node and not a JavaScript transpiler. `make` compiles the C renderer and native tests exclusively through ICK; it does not run Field Mouse or substitute Node for it.
 
-`make test` verifies a C raster fixture. `FIELD_MOUSE=/path/to/fieldmouse
+`make test` executes ICK-compiled C tests for Sublixel and the framebuffer. `FIELD_MOUSE=/path/to/fieldmouse
 make test-fieldmouse` exercises the actual Field Mouse executor, including
-repeated seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial geometry
-against pinned Rough.js math; it does not replace Field Mouse execution.
+repeated seeded output. The older Python numeric oracle is historical reference material until it is
+qualified under Ithon; it does not replace Field Mouse execution.
 
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,

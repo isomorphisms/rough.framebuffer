@@ -1,27 +1,16 @@
-CC ?= cc
-CFLAGS ?= -O2 -std=c11 -Wall -Wextra -Werror -pedantic
-LDLIBS = -lm
+# ICK is the only permitted source compiler. Missing ICK blocks all targets.
+.PHONY: all test test-sublixel test-fieldmouse clean
 
-.PHONY: all test test-fieldmouse test-sublixel test-sublixel-reference clean
-all: build/rough-fb
+all test test-sublixel:
+	sh sublixel/qualification/test-ick.sh
 
-build/rough-fb: src/main.c src/framebuffer.c src/framebuffer.h
-	@mkdir -p build
-	$(CC) $(CFLAGS) src/main.c src/framebuffer.c -o $@ $(LDLIBS)
-
-# The Sublixel acceptance lane requires a source-built pinned ICK.
-test: build/rough-fb test-sublixel
-	python3 tests/test_raster.py build/rough-fb
-
-test-sublixel:
-	$(MAKE) -C sublixel test-ick
-
-# GCC and Clang remain explicit non-production differential controls.
-test-sublixel-reference:
-	$(MAKE) -C sublixel test-reference
-
-test-fieldmouse: build/rough-fb
-	FIELD_MOUSE=$(FIELD_MOUSE) python3 tests/test_fieldmouse.py build/rough-fb
+# This optional integration explicitly requires an owned Ithon interpreter.
+# No Python 3 or Node fallback. Ithon compatibility is not yet qualified.
+test-fieldmouse: test-sublixel
+	@set -eu; \
+	  : "${FIELD_MOUSE:?FIELD_MOUSE must name the owned interpreter}"; \
+	  : "${ITHON:?ITHON must name an explicitly qualified interpreter}"; \
+	  FIELD_MOUSE="$$FIELD_MOUSE" "$$ITHON" tests/test_fieldmouse.py build/rough-fb
 
 clean:
 	rm -rf build

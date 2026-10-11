@@ -1,20 +1,51 @@
-# ICK compiler qualification and fallback policy
+# Mandatory owned toolchain boundary
 
-Sublixel is an ordinary C11 geometry library; ICK (not a host GCC/Clang executable) is the designated production C compiler. The earlier test run on PR #6 was a **reference compiler** check only.
+Sublixel is part of rough.framebuffer. All consumer C translation units
+(including test programs and the existing framebuffer CLI) compile exclusively
+through pinned, source-built **ICK**. No GCC/Clang differential build lanes,
+`CC ?= cc` defaults, fallback NDK builds, or reference targets remain in
+the native build recipes.
 
-The `test-ick` target uses the complete **owned ICK** C frontend from [dilapidated-shed/ick](https://github.com/dilapidated-shed/ick) at source commit `c61e448251744a2f40ad743ebef1a027bdcd2f9d`, with the GCC reference at `6294f1d9e7536e5ffcde09d1528c918d63abfef5`. The workflow materializes its source under ICK's own `ick/materialize.sh`, builds the native x86_64 C compiler, authenticates the installed `cc1`, and compiles **both** Sublixel translation units using the ICK driver exclusively. The compiler's own hosted bootstrap uses build-essential; those host compilers **do not compile Sublixel source**.
+The exact source pin is [dilapidated-shed/ick@c61e448251744a2f40ad743ebef1a027bdcd2f9d](https://github.com/dilapidated-shed/ick/tree/c61e448251744a2f40ad743ebef1a027bdcd2f9d),
+with its immutable GCC source reference pinned at
+`6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
+The program `qualification/test-ick.sh` checks both commits, ICK driver
+target and installed cc1 identity. ICK then compiles the following five sources:
 
-After ICK emits ELF64 x86_64 objects, the named Linux host linker consumes those objects with libc/libm and runs the entire test executable. This is **ICK C object generation and Linux functional validation**, not an ICK Android sysroot, ICK-only runtime/linker or device APK qualification. Toolchain paths are mandatory and missing ICK always fails closed; there is no environment auto-fallback. The driver, `cc1`, object and executable hashes are printed as receipt material.
+- `sublixel/src/curve_patch.c`
+- `sublixel/tests/test_curve_patch.c`
+- `src/framebuffer.c`
+- `src/main.c`
+- `tests/test_raster_ick.c`
 
-To execute after separately building the pinned compiler:
+It checks each ELF64 object, links the test executables and the existing
+`build/rough-fb` program, executes both native test suites, and reports
+the selected ICK binary, cc1 and artifact hashes. Missing ICK refuses all
+builds. The CI workflow explicitly exercises this negative condition.
 
 ```sh
-ICK_CC=/absolute/path/to/ick/stage/bin/x86_64-linux-gnu-gcc \
-ICK_SOURCE_DIR=/absolute/path/to/ick/checkout \
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
 HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
-make test-sublixel
+make test
 ```
 
-`make -C sublixel test-reference` is deliberately a **diagnostic-only** GCC/Clang control and never substitutes for `test-ick`. The existing rough.framebuffer renderer retains its own separate C-reference tests.
+**Stage-zero and linking exceptions:** ICK remains GCC-derived and is not
+yet self-hosting. Building the owned compiler from its pinned source uses
+system build-essential, including GCC/G++, and the Linux object linker
+uses the separately declared system compiler *only as a linker driver* for
+CRT/libc/libm. It never receives a project source file. This is honest
+ICK-compiled application code, not proof of an all-owned compiler bootstrap
+or all-ICK runtime/linker.
 
-**Open qualifications:** ICKY is not integrated as a replacement general C source parser (see ICK PR #89); this code uses ordinary C11 tokens. Android source/header, ELF32 A32/ARMv7, C67 AArch64, linker/sysroot, ABI and physical runtime acceptance remain separate and are not inferred from Linux x86_64 test success. The ICK x86_64 lane does not itself merge the work; Flexible Pipes registered dispatch and independent ai-ci remain unsatisfied.
+The earlier GCC/Clang consumer builds are superseded evidence only.
+Legacy Python raster tests are retained in the tree but are not part of
+the native acceptance path; `tests/test_raster_ick.c` exercises the same
+pixel/render boundary with ICK-compiled C. An optional Field Mouse test
+requires an explicit Ithon and has not been qualified under it.
+
+ICKY is not yet integrated as ICK's full C parser. IKE, Ithon and ILua
+are selected only for the stages they actually support; they must never
+be asserted to support this C11 code without execution evidence. Android
+packaging, phone runtime verification, registered Flexible Pipes dispatch
+and independent ai-ci acceptance remain separate, currently unmet gates.
