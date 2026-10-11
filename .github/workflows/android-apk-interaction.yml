@@ -1,4 +1,4 @@
-name: Android test APK and real gesture pixels
+name: Android test APK and real gesture pixels (5x5 Sublixel demo)
 
 on:
   pull_request:
@@ -59,6 +59,25 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install --yes --no-install-recommends ffmpeg
           command -v adb && command -v ffmpeg && command -v keytool
+      - name: Reference-only host visual adapter and both Sublixel curve suites
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          mkdir -p build/sublixel-demo
+          for cc in gcc clang; do
+            "$cc" -O2 -std=c11 -Wall -Wextra -Werror -pedantic \
+              -I src -I sublixel/include \
+              src/sublixel_demo.c sublixel/src/curve_patch.c \
+              sublixel/src/curve_patch_5x5.c tests/test_sublixel_demo.c \
+              -lm -o "build/sublixel-demo/visual-$cc"
+            "build/sublixel-demo/visual-$cc"
+            "$cc" -O2 -std=c11 -Wall -Wextra -Werror -pedantic \
+              -I sublixel/include \
+              sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c \
+              sublixel/tests/test_curve_patch_5x5.c -lm \
+              -o "build/sublixel-demo/curve5-$cc"
+            "build/sublixel-demo/curve5-$cc"
+          done
       - name: Compile both actual Android native ABIs and independent pixel oracle
         shell: bash
         run: |
@@ -173,6 +192,7 @@ jobs:
             adb exec-out screencap -p > build/android/emulator/after-restart.png
             adb logcat -d -s RoughFrameArt:I > build/android/emulator/native-frame-log.txt
             grep -E 'FRAME input_seq=.*painted=[1-9][0-9]*' build/android/emulator/native-frame-log.txt
+          grep -E 'FRAME input_seq=.*aa_samples=4 sublixel_panel=5x5 ' build/android/emulator/native-frame-log.txt
             grep -Eq 'FRAME input_seq=.*shape=enneper.*distance=6\.[0-9]+' build/android/emulator/native-frame-log.txt
             for image in before after-drag after-tap after-zoom after-restart; do ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' -frames:v 1 -pix_fmt rgb24 -f rawvideo "build/android/emulator/$image.rgb"; done
             build/android/aici-screen-witness build/android/emulator/before.rgb build/android/emulator/after-drag.rgb
