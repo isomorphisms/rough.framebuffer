@@ -184,6 +184,135 @@ int rough_fill_triangle(rough_framebuffer *fb,
     return 0;
 }
 
+/* Per-fragment Phong shading shares the original rasterizer's *actual*
+ * barycentric edge tests, half-open top-left rule and closer-is-smaller
+ * depth contract. Unlike the old P/T flat-color operation, normals and
+ * material colors are perspective-correct and interpolated at every covered
+ * sample. The AA2 wrapper runs this at each of four independently z-tested
+ * subpixel centers; resolving foreground and background happens afterward.
+ */
+static int valid_smooth_vertex(rough_smooth_vertex v) {
+    if (!valid_vertex(v.position) ||
+        !isfinite(v.reciprocal_z) || !(v.reciprocal_z > 0.0) ||
+        !isfinite(v.normal_x) || !isfinite(v.normal_y) ||
+        !isfinite(v.normal_z) ||
+        !isfinite(v.base_red) || !isfinite(v.base_green) ||
+        !isfinite(v.base_blue)) return 0;
+    return v.base_red >= 0.0 && v.base_red <= 255.0 &&
+           v.base_green >= 0.0 && v.base_green <= 255.0 &&
+           v.base_blue >= 0.0 && v.base_blue <= 255.0 &&
+           v.normal_x * v.normal_x +
+           v.normal_y * v.normal_y +
+           v.normal_z * v.normal_z > 1e-12;
+}
+
+static unsigned smooth_byte(double value) {
+    if (value <= 0.0) return 0u;
+    if (value >= 255.0) return 255u;
+    return (unsigned)floor(value + 0.5);
+}
+
+int rough_fill_smooth_triangle(rough_framebuffer *fb,
+                               rough_smooth_vertex v0,
+                               rough_smooth_vertex v1,
+                               rough_smooth_vertex v2) {
+    if (!valid_target(fb) || !fb->depth ||
+        !valid_smooth_vertex(v0) ||
+        !valid_smooth_vertex(v1) ||
+        !valid_smooth_vertex(v2)) return -1;
+
+    rough_vertex p0 = v0.position, p1 = v1.position, p2 = v2.position;
+    double area = edge_value(p0, p1, p2.x, p2.y);
+    if (!isfinite(area)) return -1;
+    if (area == 0.0) return 0;
+    if (area < 0.0) {
+        rough_smooth_vertex temp = v1;
+        v1 = v2;
+        v2 = temp;
+        p1 = v1.position;
+        p2 = v2.position;
+        area = -area;
+    }
+
+    double minimum_x = fmin(p0.x, fmin(p1.x, p2.x));
+    double maximum_x = fmax(p0.x, fmax(p1.x, p2.x));
+    double minimum_y = fmin(p0.y, fmin(p1.y, p2.y));
+    double maximum_y = fmax(p0.y, fmax(p1.y, p2.y));
+    if (maximum_x < 0.0 || maximum_y < 0.0 ||
+        minimum_x > (double)fb->width - 1.0 ||
+        minimum_y > (double)fb->height - 1.0) return 0;
+
+    int first_x = (int)ceil(fmax(0.0, minimum_x));
+    int last_x = (int)floor(fmin((double)fb->width - 1.0, maximum_x));
+    int first_y = (int)ceil(fmax(0.0, minimum_y));
+    int last_y = (int)floor(fmin((double)fb->height - 1.0, maximum_y));
+    if (first_x > last_x || first_y > last_y) return 0;
+
+    int edge0_inclusive = top_left_edge(p1, p2);
+    int edge1_inclusive = top_left_edge(p2, p0);
+    int edge2_inclusive = top_left_edge(p0, p1);
+
+    /* The direction is a fixed camera-space light, normalized once.
+     * Keeping this identical across triangles prevents lighting seams. */
+    const double light_x = -0.42;
+    const double light_y = -0.55;
+    const double light_z = -0.72;
+    const double light_length = 0.998649087151;
+    for (int y = first_y; y <= last_y; ++y) {
+        for (int x = first_x; x <= last_x; ++x) {
+            double e0 = edge_value(p1, p2, (double)x, (double)y);
+            double e1 = edge_value(p2, p0, (double)x, (double)y);
+            double e2 = edge_value(p0, p1, (double)x, (double)y);
+            if (!inside_edge(e0, edge0_inclusive) ||
+                !inside_edge(e1, edge1_inclusive) ||
+                !inside_edge(e2, edge2_inclusive)) continue;
+            double w0 = e0 / area, w1 = e1 / area, w2 = e2 / area;
+            double depth = w0 * p0.depth + w1 * p1.depth + w2 * p2.depth;
+            if (!isfinite(depth) || fabs(depth) > FLT_MAX) return -1;
+            size_t d_index = (size_t)y * fb->depth_stride + (unsigned)x;
+            if (!(depth < (double)fb->depth[d_index])) continue;
+
+            double k0 = w0 * v0.reciprocal_z;
+            double k1 = w1 * v1.reciprocal_z;
+            double k2 = w2 * v2.reciprocal_z;
+            double total = k0 + k1 + k2;
+            if (!isfinite(total) || !(total > 0.0)) return -1;
+
+            /* Dividing each interpolated normal by total cancels during
+             * normalization; this saves three fragment divisions. */
+            double nx = k0 * v0.normal_x + k1 * v1.normal_x +
+                        k2 * v2.normal_x;
+            double ny = k0 * v0.normal_y + k1 * v1.normal_y +
+                        k2 * v2.normal_y;
+            double nz = k0 * v0.normal_z + k1 * v1.normal_z +
+                        k2 * v2.normal_z;
+            double normal_length = sqrt(nx * nx + ny * ny + nz * nz);
+            if (!(normal_length > 1e-14) || !isfinite(normal_length))
+                return -1;
+            double lambert = fabs(nx * light_x + ny * light_y +
+                                  nz * light_z) /
+                             (normal_length * light_length);
+            double illumination = 0.20 + 0.80 * clamp_unit(lambert);
+            double red = (k0 * v0.base_red + k1 * v1.base_red +
+                          k2 * v2.base_red) / total;
+            double green = (k0 * v0.base_green + k1 * v1.base_green +
+                            k2 * v2.base_green) / total;
+            double blue = (k0 * v0.base_blue + k1 * v1.base_blue +
+                           k2 * v2.base_blue) / total;
+            if (!isfinite(red) || !isfinite(green) || !isfinite(blue))
+                return -1;
+
+            uint32_t color = UINT32_C(0xff000000) |
+                             (uint32_t)(smooth_byte(red * illumination) << 16) |
+                             (uint32_t)(smooth_byte(green * illumination) << 8) |
+                             (uint32_t)smooth_byte(blue * illumination);
+            fb->depth[d_index] = (float)depth;
+            fb->pixels[(size_t)y * fb->stride_pixels + (unsigned)x] = color;
+        }
+    }
+    return 0;
+}
+
 static int valid_width(double width) {
     return width > 0.0 && width <= MAX_STROKE_WIDTH && isfinite(width);
 }
