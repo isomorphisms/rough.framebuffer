@@ -11,6 +11,29 @@ invalidates stale touch coordinates. A source/renderer pixel-and-depth parity
 test ensures the direct path is the same mathematics as the original
 `P/T` operation stream.
 
+## C67 2×2 software coverage antialiasing
+
+On the MIRO C67 `arm64-v8a` build, and in the x86-64 Android emulator, the
+native rasterizer now evaluates **four independently depth-tested color samples
+per bounded software framebuffer pixel**. The same triangle producer runs
+at twice the width and height; `rough_resolve_2x2()` resolves those samples
+in premultiplied-alpha space and uses their nearest depth, then the existing
+Android RGBA8888 presenter maps the image onto the display.
+
+This is **real subpixel edge coverage at the software framebuffer resolution**,
+not a blur of an already aliased image. With the current 180,000-pixel base
+budget, the high-resolution scratch has up to 720,000 pixels (color and
+depth together about 5.76 MiB), plus about 1.44 MiB for the base buffers.
+It is reused across touch redraws. The older Android ARM32 A1 build preserves
+the one-sample renderer for responsiveness and memory.
+
+It is not full-resolution multisampling of every 720×1600 display pixel.
+Edges under extreme zoom may still expose the software resolution. More
+importantly, this does **not** yet interpolate analytic normals or lighting
+across triangles: colored polygon facets remain part of
+[the open visual-quality issue #5](https://github.com/isomorphisms/rough.framebuffer/issues/5).
+A physical C67 speed and quality comparison of this updated APK is still needed.
+
 ## Native lifecycle and pixels
 
 The NDK native-app-glue callback receives Android NativeActivity window
