@@ -40,10 +40,10 @@ $(BUILD_DIR)/android_native_app_glue.o: check-ndk
 	@mkdir -p $(BUILD_DIR)
 	$(ANDROID_CC) -std=c11 -O2 -fPIC -Wall -Wextra -Werror -Wno-unused-parameter -isystem $(GLUE_DIR) -c $(GLUE_DIR)/android_native_app_glue.c -o $@
 
-$(ANDROID_LIB): ../android/native/rough_android.c ../src/touch.c ../src/touch.h ../src/surface.c ../src/surface.h ../src/framebuffer.c ../src/framebuffer.h ../src/present.c ../src/present.h $(BUILD_DIR)/android_native_app_glue.o
+$(ANDROID_LIB): ../android/native/rough_android.c ../src/touch.c ../src/touch.h ../src/surface.c ../src/surface.h ../src/framebuffer.c ../src/framebuffer.h ../src/present.c ../src/present.h ../src/surface_aa.c ../src/surface_aa.h $(BUILD_DIR)/android_native_app_glue.o
 	$(ANDROID_CC) -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror -pedantic \
 	    -isystem $(GLUE_DIR) -I../src -I../android/native \
-	    ../android/native/rough_android.c ../src/touch.c ../src/surface.c ../src/framebuffer.c ../src/present.c \
+	    ../android/native/rough_android.c ../src/touch.c ../src/surface.c ../src/framebuffer.c ../src/present.c ../src/surface_aa.c \
 	    $(BUILD_DIR)/android_native_app_glue.o \
 	    -Wl,--no-undefined -Wl,-soname,libroughart.so $(ANDROID_LINK_ALIGNMENT) \
 	    -landroid -llog -lm -o $@
