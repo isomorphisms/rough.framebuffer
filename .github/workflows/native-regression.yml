@@ -70,6 +70,29 @@ jobs:
           grep -Fq 'changed > 20u' build/bad_single_sample.log
           echo 'AA_SUBPIXEL_MUTANT_KILLED'
 
+      - name: Kill constant-normal flat shading mutant
+        if: matrix.compiler == 'gcc'
+        run: |
+          set -eu
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('src/framebuffer.c').read_text()
+          begin = source.index('            double nx = k0 * v0.normal_x')
+          end = source.index('            double normal_length =', begin)
+          source = source[:begin] + ('            double nx = v0.normal_x;\n'
+                                      '            double ny = v0.normal_y;\n'
+                                      '            double nz = v0.normal_z;\n') + source[end:]
+          Path('build/flat_normal_mutant.c').write_text(source)
+          PY
+          gcc -O2 -std=c11 -Wall -Wextra -Werror -pedantic -Isrc \
+            tests/test_smooth.c src/surface.c build/flat_normal_mutant.c \
+            -lm -o build/test-flat-normal-mutant
+          if (ulimit -c 0; ./build/test-flat-normal-mutant > build/flat_normal.log 2>&1); then
+            echo 'Smooth shading false pass: constant normal accepted' >&2
+            exit 1
+          fi
+          grep -Fq 'test_normal_is_evaluated_per_fragment' build/flat_normal.log
+          echo 'SMOOTH_NORMAL_MUTANT_KILLED'
       - name: Render inspectable frames
         if: matrix.compiler == 'gcc'
         run: |
