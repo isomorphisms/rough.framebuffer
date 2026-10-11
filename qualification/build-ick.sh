@@ -38,7 +38,7 @@ case "$cc1" in
 esac
 
 mkdir -p "$root/build/ick"
-flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math"
+flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math -fPIC"
 for name in main framebuffer; do
     "$ICK_CC" $flags -I"$root/src" -c "$root/src/$name.c" -o "$root/build/ick/$name.o"
     readelf -h "$root/build/ick/$name.o" | grep -q 'Class:.*ELF64'
