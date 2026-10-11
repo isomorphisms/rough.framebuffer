@@ -1,13 +1,16 @@
-name: Sublixel 3x3+5x5 ICK source compiler qualification
+name: ICK-required framebuffer and Sublixel C qualification
 on:
   pull_request:
     paths:
       - 'sublixel/**'
+      - 'qualification/**'
       - 'Makefile'
+      - 'README.md'
       - '.github/workflows/sublixel-3x3.yml'
   push:
     branches:
       - 'sublixel/**'
+      - 'policy/**'
     paths:
       - 'sublixel/**'
       - 'Makefile'
@@ -88,7 +91,7 @@ jobs:
           make -C ick-toolchain/build -j2 all-gcc
           make -C ick-toolchain/build install-gcc
 
-      - name: Compile and execute all Sublixel tests from ICK objects
+      - name: Compile and execute framebuffer and all Sublixel tests from ICK objects
         shell: bash
         env:
           ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
@@ -96,7 +99,9 @@ jobs:
           HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
         run: |
           set -euo pipefail
-          make test-sublixel
+          make test
+      - name: Prove mandatory compiler rejects absence, stock GCC and fake ICK
+        run: sh qualification/test-compiler-policy.sh
 
   reference:
     name: Reference-only / ${{ matrix.cc }}
@@ -110,8 +115,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
-      - name: Differential test (not ICK acceptance)
-        run: make test-sublixel-reference CC=${{ matrix.cc }}
+      - name: Differential framebuffer and Sublixel tests (not ICK acceptance)
+        run: make test-reference REFERENCE_CC=${{ matrix.cc }} CC=${{ matrix.cc }}
+      - name: Prove reference tests cannot substitute for ICK
+        run: sh qualification/test-compiler-policy.sh
       - name: Reference sanitizers (not ICK acceptance)
         shell: bash
         run: |
