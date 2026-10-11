@@ -29,10 +29,15 @@ build/test-present: tests/test_present.c src/present.c src/present.h src/surface
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc tests/test_present.c src/present.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present
+build/test-rotation-grab: tests/test_rotation_grab.c src/touch.c src/touch.h src/surface.c src/surface.h src/framebuffer.c src/framebuffer.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc tests/test_rotation_grab.c src/touch.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
+
+test: build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present build/test-rotation-grab
 	./build/test-api
 	./build/test-surface
 	./build/test-touch
+	./build/test-rotation-grab
 	./build/test-present
 	python3 tests/test_raster.py build/rough-fb
 
