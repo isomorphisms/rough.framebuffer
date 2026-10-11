@@ -1,0 +1,180 @@
+name: Sublixel ICK compiler + Ike orchestrated C11 qualification
+on:
+  pull_request:
+    paths:
+      - 'sublixel/**'
+      - 'Makefile'
+      - 'Ikefile'
+      - 'scripts/run-ike.sh'
+      - 'sublixel/Makefile'
+      - 'src/framebuffer.c'
+      - 'src/framebuffer.h'
+      - 'src/main.c'
+      - 'tests/test_raster_ick.c'
+      - '.github/workflows/sublixel-3x3.yml'
+  push:
+    branches:
+      - 'sublixel/**'
+    paths:
+      - 'sublixel/**'
+      - 'Makefile'
+      - 'Ikefile'
+      - 'scripts/run-ike.sh'
+      - 'sublixel/Makefile'
+      - 'src/framebuffer.c'
+      - 'src/framebuffer.h'
+      - 'src/main.c'
+      - 'tests/test_raster_ick.c'
+      - '.github/workflows/sublixel-3x3.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ick-native:
+    name: Source-built ICK and Ike, project-native C tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact Sublixel candidate
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Check out immutable owned ICK compiler source and pinned GCC reference
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: dilapidated-shed/ick
+          ref: c61e448251744a2f40ad743ebef1a027bdcd2f9d
+          path: ick-toolchain
+          submodules: true
+          persist-credentials: false
+      - name: Check out exact owned Ike build orchestrator source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: dilapidated-shed/ike
+          ref: a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0
+          path: ike-toolchain
+          persist-credentials: false
+
+      - name: Verify immutable compiler identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C ick-toolchain rev-parse HEAD)" = 'c61e448251744a2f40ad743ebef1a027bdcd2f9d'
+          test "$(git -C ick-toolchain/gcc rev-parse HEAD)" = '6294f1d9e7536e5ffcde09d1528c918d63abfef5'
+          grep -Fxq 'gcc_commit=6294f1d9e7536e5ffcde09d1528c918d63abfef5' ick-toolchain/ick/SOURCE.lock
+          test "$(git -C ike-toolchain rev-parse HEAD)" = 'a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0'
+
+      - name: Install explicit ICK stage-zero bootstrap dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential flex texinfo \
+            libgmp-dev libmpfr-dev libmpc-dev libisl-dev libzstd-dev binutils
+
+      - name: Materialize ICK owned source; never modify GCC reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ick-toolchain
+          sh ick/materialize.sh gcc source
+          test -d source/gcc/c
+          test -d source/gcc/c-family
+
+      - name: Configure pinned ICK for native x86_64 Linux C
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ick-toolchain/build ick-toolchain/stage
+          cd ick-toolchain/build
+          ../source/configure \
+            --target=x86_64-linux-gnu \
+            --prefix="$GITHUB_WORKSPACE/ick-toolchain/stage" \
+            --with-as="$(command -v x86_64-linux-gnu-as)" \
+            --with-ld="$(command -v x86_64-linux-gnu-ld)" \
+            --enable-languages=c \
+            --disable-bootstrap \
+            --disable-multilib \
+            --disable-nls \
+            --disable-shared \
+            --disable-threads \
+            --without-headers \
+            --disable-libatomic \
+            --disable-libgomp \
+            --disable-libquadmath \
+            --disable-libssp \
+            --disable-libvtv
+      - name: Build owned ICK compiler from pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/make -C ick-toolchain/build -j2 all-gcc
+          /usr/bin/make -C ick-toolchain/build install-gcc
+
+
+      - name: Compile owned Ike from pinned source using ICK
+        shell: bash
+        env:
+          ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          test "$(git -C ike-toolchain rev-parse HEAD)" = 'a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0'
+          mkdir -p .owned/bin
+          "$ICK_CC" -O2 -std=c11 -Wall -Wextra -Werror -pedantic -fPIC \
+            -c ike-toolchain/ike.c -o .owned/ike.o
+          readelf -h .owned/ike.o | grep -q 'Class:.*ELF64'
+          readelf -h .owned/ike.o | grep -q 'Machine:.*Advanced Micro Devices X86-64'
+          "$HOST_LINKER" .owned/ike.o -o .owned/bin/ike
+          test -x .owned/bin/ike
+          sha256sum "$ICK_CC" .owned/ike.o .owned/bin/ike
+
+      - name: Run 3x3 and native framebuffer through pinned Ike and ICK
+        shell: bash
+        env:
+          ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
+          ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
+          export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
+          export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
+          export IKE_RECEIPT="$RUNNER_TEMP/ike-sublixel-$GITHUB_RUN_ID-$$.tsv"
+          sh scripts/run-ike.sh test
+          grep -Fxq $'schema\tike-build-v1' "$IKE_RECEIPT"
+          grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
+          cat "$IKE_RECEIPT"
+
+      - name: Prove absent Ike/ICK and GNU Make fallback are blocked
+        shell: bash
+        run: |
+          set -euo pipefail
+          if env -u IKE_BIN -u IKE_SOURCE_DIR -u IKE_EXPECTED_SHA256 \
+             -u IKE_RECEIPT sh scripts/run-ike.sh test > /tmp/no-ike.log 2>&1; then
+            echo 'Unexpected build without Ike' >&2
+            exit 1
+          fi
+          grep -q 'IKE_BIN' /tmp/no-ike.log
+          if /usr/bin/make test > /tmp/gnu-make.log 2>&1; then
+            echo 'GNU Make unexpectedly accepted the product build' >&2
+            exit 1
+          fi
+          grep -q 'GNU Make is forbidden' /tmp/gnu-make.log
+          echo 'Owned-toolchain missing/fallback controls: PASS'
+
+      - name: Reject stock GCC and success-only ICK impostors
+        shell: bash
+        env:
+          ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          for fake in /usr/bin/gcc /bin/true; do
+            if ICK_CC="$fake" sh sublixel/qualification/test-ick.sh > /tmp/fake-ick.log 2>&1; then
+              echo "Accepted counterfeit compiler: $fake" >&2
+              exit 1
+            fi
+            grep -Fq 'BLOCKED: compiler is not the pinned ICK installation' /tmp/fake-ick.log
+          done
+          echo 'Stock and fake ICK drivers correctly rejected'
