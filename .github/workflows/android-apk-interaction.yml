@@ -65,10 +65,17 @@ jobs:
           set -Eeuo pipefail
           ndk="$ANDROID_HOME/ndk/29.0.14206865"
           make -C android NDK_ROOT="$ndk" ANDROID_ABI=armeabi-v7a ANDROID_API=21
+          make -C android NDK_ROOT="$ndk" ANDROID_ABI=arm64-v8a ANDROID_API=21
           make -C android NDK_ROOT="$ndk" ANDROID_ABI=x86_64 ANDROID_API=21
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          "$readelf" -h build/android/arm64-v8a/libroughart.so > build/android/c67-elf-header.txt
+          "$readelf" -lW build/android/arm64-v8a/libroughart.so > build/android/c67-elf-programs.txt
+          grep -Eq 'Class: *ELF64' build/android/c67-elf-header.txt
+          grep -Eq 'Machine: *AArch64' build/android/c67-elf-header.txt
+          awk '$1=="LOAD" {count++; if ($NF != "0x4000") exit 1} END {if (count < 1) exit 1}' build/android/c67-elf-programs.txt
           mkdir -p build/android
           cc -std=c17 -O2 -Wall -Wextra -Werror -pedantic _aici_screen_oracle/framebuffer/verify_android_screens.c -o build/android/aici-screen-witness
-          sha256sum build/android/{armeabi-v7a,x86_64}/libroughart.so
+          sha256sum build/android/{armeabi-v7a,arm64-v8a,x86_64}/libroughart.so
       - name: Resolve signer strictly from candidate central test registry
         shell: bash
         run: |
@@ -96,7 +103,7 @@ jobs:
           ANDROID_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -Eeuo pipefail
-          for abi in armeabi-v7a x86_64; do
+          for abi in armeabi-v7a arm64-v8a x86_64; do
             bash _canonical_ndk/apk/build-nativeactivity-apk.sh \
               android/AndroidManifest.xml \
               "build/android/$abi/libroughart.so" "$abi" \
@@ -107,6 +114,24 @@ jobs:
         with:
           apk: build/android/roughart-armeabi-v7a.apk
           lane: test
+      - name: Verify finished C67-native arm64-v8a APK against independent test-only signer registry
+        uses: ./_aici_test_signing/android-signing
+        with:
+          apk: build/android/roughart-arm64-v8a.apk
+          lane: test
+      - name: Prove C67 package contains matching AArch64 ELF and no ARM32 fallback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          apk=build/android/roughart-arm64-v8a.apk
+          elf=build/android/arm64-v8a/libroughart.so
+          unzip -Z1 "$apk" | grep -Fx 'lib/arm64-v8a/libroughart.so'
+          if unzip -Z1 "$apk" | grep -Eq '(^|/)classes[0-9]*\.dex$|^lib/(armeabi-v7a|x86_64)/'; then
+            echo "C67-native APK contains wrong ABI or unexpected DEX" >&2
+            exit 1
+          fi
+          unzip -p "$apk" lib/arm64-v8a/libroughart.so | cmp - "$elf"
+          sha256sum "$apk" "$elf"
       - name: Verify finished emulator APK against independent proposed test-only signer registry
         uses: ./_aici_test_signing/android-signing
         with:
@@ -158,10 +183,14 @@ jobs:
       - name: Retain candidate-only signed APK and real emulator frames if accepted
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: roughart-testonly-emulator-accepted-${{ github.event.pull_request.head.sha || github.sha }}
+          name: roughart-a1-c67-testonly-emulator-accepted-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             build/android/roughart-armeabi-v7a.apk
             build/android/roughart-armeabi-v7a.receipt.tsv
+            build/android/roughart-arm64-v8a.apk
+            build/android/roughart-arm64-v8a.receipt.tsv
+            build/android/c67-elf-header.txt
+            build/android/c67-elf-programs.txt
             build/android/roughart-x86_64.apk
             build/android/roughart-x86_64.receipt.tsv
             build/android/emulator/*.png
