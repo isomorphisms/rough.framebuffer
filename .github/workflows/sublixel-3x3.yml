@@ -1,4 +1,4 @@
-name: Sublixel 3x3 C11 tests
+name: Sublixel 3x3 ICK source compiler qualification
 on:
   pull_request:
     paths:
@@ -12,17 +12,108 @@ on:
       - 'sublixel/**'
       - 'Makefile'
       - '.github/workflows/sublixel-3x3.yml'
+
+permissions:
+  contents: read
+
 jobs:
-  native:
-    runs-on: ubuntu-latest
+  ick-native:
+    name: Source-built ICK x86_64 C11
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out exact Sublixel candidate
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Check out immutable owned ICK compiler source and pinned GCC reference
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: dilapidated-shed/ick
+          ref: c61e448251744a2f40ad743ebef1a027bdcd2f9d
+          path: ick-toolchain
+          submodules: true
+          persist-credentials: false
+      - name: Verify immutable compiler identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C ick-toolchain rev-parse HEAD)" = 'c61e448251744a2f40ad743ebef1a027bdcd2f9d'
+          test "$(git -C ick-toolchain/gcc rev-parse HEAD)" = '6294f1d9e7536e5ffcde09d1528c918d63abfef5'
+          grep -Fxq 'gcc_commit=6294f1d9e7536e5ffcde09d1528c918d63abfef5' ick-toolchain/ick/SOURCE.lock
+
+      - name: Install explicit ICK compiler bootstrap dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential flex texinfo \
+            libgmp-dev libmpfr-dev libmpc-dev libisl-dev libzstd-dev binutils
+
+      - name: Materialize ICK owned source; never modify GCC reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ick-toolchain
+          sh ick/materialize.sh gcc source
+          test -d source/gcc/c
+          test -d source/gcc/c-family
+
+      - name: Configure pinned ICK for native x86_64 Linux C
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ick-toolchain/build ick-toolchain/stage
+          cd ick-toolchain/build
+          ../source/configure \
+            --target=x86_64-linux-gnu \
+            --prefix="$GITHUB_WORKSPACE/ick-toolchain/stage" \
+            --with-as="$(command -v x86_64-linux-gnu-as)" \
+            --with-ld="$(command -v x86_64-linux-gnu-ld)" \
+            --enable-languages=c \
+            --disable-bootstrap \
+            --disable-multilib \
+            --disable-nls \
+            --disable-shared \
+            --disable-threads \
+            --without-headers \
+            --disable-libatomic \
+            --disable-libgomp \
+            --disable-libquadmath \
+            --disable-libssp \
+            --disable-libvtv
+      - name: Build owned ICK compiler rather than compiling Sublixel with host GCC
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C ick-toolchain/build -j2 all-gcc
+          make -C ick-toolchain/build install-gcc
+
+      - name: Compile and execute all Sublixel tests from ICK objects
+        shell: bash
+        env:
+          ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
+          ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          make test-sublixel
+
+  reference:
+    name: Reference-only / ${{ matrix.cc }}
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         cc: [gcc, clang]
     steps:
-      - uses: actions/checkout@v4
-      - name: Compile and run (strict C11)
-        run: make test-sublixel CC=${{ matrix.cc }}
-      - name: Compile and run (ASan/UBSan)
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Differential test (not ICK acceptance)
+        run: make test-sublixel-reference CC=${{ matrix.cc }}
+      - name: Reference sanitizers (not ICK acceptance)
+        shell: bash
         run: |
           make -C sublixel clean
-          make -C sublixel test CC=${{ matrix.cc }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
+          make test-sublixel-reference CC=${{ matrix.cc }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
