@@ -4,7 +4,12 @@
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+test_shadow=
+cleanup() {
+    rm -rf "$tmp"
+    if [ -n "$test_shadow" ]; then rm -f "$test_shadow"; fi
+}
+trap cleanup EXIT HUP INT TERM
 : "${IKE_BIN:?required pinned Ike}"
 : "${IKE_SOURCE_DIR:?required pinned Ike checkout}"
 : "${IKE_EXPECTED_SHA256:?required checked Ike digest}"
@@ -78,6 +83,21 @@ for fake in /usr/bin/gcc /bin/true; do
     require_text "fake-$label" 'BLOCKED: compiler is not the pinned ICK installation'
     require_failed_receipt "$file"
 done
+
+# Ike v1 uses target-file mtimes. An attacker can create a future-dated
+# file called "test" so the recipe is skipped and Ike still writes final PASS.
+# The checked wrapper must reject the resulting no-recipe receipt.
+test_shadow="$root/test"
+test ! -e "$test_shadow" || {
+    echo 'Cannot run skipped-recipe negative: test target already exists' >&2
+    exit 1
+}
+touch -t 203801010000 "$test_shadow"
+expect_block skipped-recipe env IKE_RECEIPT="$tmp/skipped.tsv" \
+    sh "$root/scripts/run-ike.sh" test
+require_text skipped-recipe 'Ike recipe receipt mismatch'
+rm -f "$test_shadow"
+test_shadow=
 
 # Even if CC points at a host compiler, the product must still be compiled by
 # authenticated ICK. This is a positive real rebuild, not a string-only check.
