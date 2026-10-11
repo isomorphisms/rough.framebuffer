@@ -17,6 +17,7 @@
 #include <stdlib.h>
 
 #include "framebuffer.h"
+#include "present.h"
 #include "surface.h"
 #include "touch.h"
 
@@ -153,21 +154,15 @@ static void redraw(rough_android_state *state) {
         if (pixel != 0xffffffffu) ++painted;
     }
 
-    /* Native window is explicitly RGBA_8888 byte order, not an assumption
-     * that its pixels have the renderer's 0xAARRGGBB integer layout. */
-    for (unsigned y = 0; y < height; ++y) {
-        uint8_t *row = (uint8_t *)buffer.bits +
-                       (size_t)y * (unsigned)buffer.stride * 4u;
-        unsigned source_y = (unsigned)((uint64_t)y * rh / height);
-        for (unsigned x = 0; x < width; ++x) {
-            unsigned source_x = (unsigned)((uint64_t)x * rw / width);
-            uint32_t pixel = state->pixels[(size_t)source_y * rw + source_x];
-            uint8_t *rgba = row + (size_t)x * 4u;
-            rgba[0] = (uint8_t)(pixel >> 16);
-            rgba[1] = (uint8_t)(pixel >> 8);
-            rgba[2] = (uint8_t)pixel;
-            rgba[3] = (uint8_t)(pixel >> 24);
-        }
+    /* Explicit straight-alpha ARGB -> Android RGBA8888 conversion and
+     * premultiplied-alpha bilinear upsampling. The same native triangle
+     * framebuffer supplies every pixel; padding in the Android stride stays
+     * untouched, and no second graphics renderer is introduced. */
+    if (rough_present_rgba8888(&target, (uint8_t *)buffer.bits,
+                               width, height, (unsigned)buffer.stride)) {
+        log_error("Could not present RGBA8888 framebuffer");
+        ANativeWindow_unlockAndPost(app->window);
+        return;
     }
     if (ANativeWindow_unlockAndPost(app->window) < 0) {
         log_error("Could not post Android window frame");
