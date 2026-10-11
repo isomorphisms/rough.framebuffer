@@ -1,0 +1,28 @@
+name: Sublixel 3x3 C11 tests
+on:
+  pull_request:
+    paths:
+      - 'sublixel/**'
+      - 'Makefile'
+      - '.github/workflows/sublixel-3x3.yml'
+  push:
+    branches:
+      - 'sublixel/**'
+    paths:
+      - 'sublixel/**'
+      - 'Makefile'
+      - '.github/workflows/sublixel-3x3.yml'
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cc: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run (strict C11)
+        run: make test-sublixel CC=${{ matrix.cc }}
+      - name: Compile and run (ASan/UBSan)
+        run: |
+          make -C sublixel clean
+          make -C sublixel test CC=${{ matrix.cc }} CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
