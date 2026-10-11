@@ -12,3 +12,7 @@ clean depends on Ikefile
 # Policy-only qualification; no GNU Make product or reference-compiler lane.
 policy-check depends on Ikefile qualification/test-compiler-policy.sh scripts/run-ike.sh sublixel/qualification/test-ick.sh
     sh qualification/test-compiler-policy.sh
+
+# Genuine consumer: 3x3/5x5 sampled Bezier coverage rendered to a P6 PPM.
+preview depends on test sublixel/examples/preview.c sublixel/examples/build-preview.sh
+    sh sublixel/examples/build-preview.sh

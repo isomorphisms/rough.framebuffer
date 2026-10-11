@@ -48,6 +48,18 @@ optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 `disableMultiStroke`, and `color` (an RGB triplet). Supported types: `line`,
 `rectangle`, `polyline`, `polygon`.
 
+## Native Sublixel visual comparison (candidate)
+
+The ICK-built `sublixel/examples/preview.c` consumes both local curvature APIs and accumulates real 8×8 subpixel occupancy into two side-by-side 96×72 panels. It draws a genuinely slanted cubic Bézier stroke rather than a horizontal synthetic line or copied bitmap.
+
+From a host with the pinned source-built ICK and Ike environment configured above:
+
+```sh
+sh scripts/run-ike.sh preview
+```
+
+The resulting `sublixel/build/curve-3x3-vs-5x5.ppm` is a P6 image of size 192×72. The example runs genuine slant, partial-coverage, duplicate-union, deterministic frame and PPM format tests, then records the image SHA-256. See [the example's scope and limitations](sublixel/examples/README.md). It is a **native CPU preview only**, not an Android APK or a claimed repair of 3D triangle aliasing on C67.
+
 ## Pipeline
 
 ```
