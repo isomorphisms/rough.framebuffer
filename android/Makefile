@@ -1,4 +1,5 @@
-# DEX-free Android NativeActivity build for MIRO A1 (ARMv7/A32).
+# DEX-free Android NativeActivity build for MIRO A1 (ARMv7/A32) and
+# MIRO C67 (AArch64/arm64-v8a); the same renderer/input implementation.
 # ICK at the recorded current revision lacks qualified Android NativeActivity
 # host-system integration for this C source closure, so this candidate uses
 # the explicit Android NDK C compiler rather than an accidental host CC.
@@ -10,11 +11,14 @@ ANDROID_ABI ?= armeabi-v7a
 ifeq ($(ANDROID_ABI),armeabi-v7a)
 ANDROID_TARGET := armv7a-linux-androideabi
 ANDROID_LINK_ALIGNMENT :=
+else ifeq ($(ANDROID_ABI),arm64-v8a)
+ANDROID_TARGET := aarch64-linux-android
+ANDROID_LINK_ALIGNMENT := -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 else ifeq ($(ANDROID_ABI),x86_64)
 ANDROID_TARGET := x86_64-linux-android
 ANDROID_LINK_ALIGNMENT := -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384
 else
-$(error Unsupported Android ABI $(ANDROID_ABI); supported: armeabi-v7a, x86_64)
+$(error Unsupported Android ABI $(ANDROID_ABI); supported: armeabi-v7a, arm64-v8a, x86_64)
 endif
 NDK_TOOLCHAIN := $(NDK_ROOT)/toolchains/llvm/prebuilt/linux-x86_64/bin
 ANDROID_CC := $(NDK_TOOLCHAIN)/$(ANDROID_TARGET)$(ANDROID_API)-clang
@@ -28,7 +32,7 @@ all: $(ANDROID_LIB)
 
 check-ndk:
 	@test -n "$(NDK_ROOT)" || { echo "Android NDK root is not declared" >&2; exit 1; }
-	@test -x "$(ANDROID_CC)" || { echo "Missing ARMv7 NDK Clang: $(ANDROID_CC)" >&2; exit 1; }
+	@test -x "$(ANDROID_CC)" || { echo "Missing selected Android NDK Clang: $(ANDROID_CC)" >&2; exit 1; }
 	@test -f "$(GLUE_DIR)/android_native_app_glue.c" || { echo "Missing NDK native app glue" >&2; exit 1; }
 	@test -x "$(ANDROID_READELF)" || { echo "Missing NDK llvm-readelf" >&2; exit 1; }
 
