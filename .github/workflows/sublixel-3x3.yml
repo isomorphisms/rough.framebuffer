@@ -1,4 +1,4 @@
-name: Sublixel 3x3 ICK source compiler qualification
+name: Sublixel 3x3+5x5 ICK source compiler qualification
 on:
   pull_request:
     paths:

@@ -39,18 +39,28 @@ mkdir -p "$output_dir"
 flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math"
 # Deliberate ordinary C dialect: ICKY's replacement parser is not yet adopted.
 # Separate -c invocations must not silently invoke host GCC or Clang as a C compiler.
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c   "$repo_root/sublixel/src/curve_patch.c" -o "$output_dir/curve_patch.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c   "$repo_root/sublixel/tests/test_curve_patch.c" -o "$output_dir/test_curve_patch.o"
-readelf -h "$output_dir/curve_patch.o" | grep -q 'Class:.*ELF64'
-readelf -h "$output_dir/curve_patch.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
-readelf -h "$output_dir/test_curve_patch.o" | grep -q 'Class:.*ELF64'
-readelf -h "$output_dir/test_curve_patch.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
+for stem in curve_patch curve_patch_5x5; do
+    "$ICK_CC" $flags -I"$repo_root/sublixel/include" -c "$repo_root/sublixel/src/$stem.c" -o "$output_dir/$stem.o"
+done
+for stem in test_curve_patch test_curve_patch_5x5; do
+    "$ICK_CC" $flags -I"$repo_root/sublixel/include" -c "$repo_root/sublixel/tests/$stem.c" -o "$output_dir/$stem.o"
+done
+for stem in curve_patch curve_patch_5x5 test_curve_patch test_curve_patch_5x5; do
+    readelf -h "$output_dir/$stem.o" | grep -q 'Class:.*ELF64'
+    readelf -h "$output_dir/$stem.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
+done
 
-"$HOST_LINKER" "$output_dir/curve_patch.o" "$output_dir/test_curve_patch.o"   -lm -o "$output_dir/test_curve_patch"
+for stem in test_curve_patch test_curve_patch_5x5; do
+    "$HOST_LINKER" "$output_dir/curve_patch.o" "$output_dir/curve_patch_5x5.o" "$output_dir/$stem.o" -lm -o "$output_dir/$stem"
+done
 printf 'ICK source: %s\n' "c61e448251744a2f40ad743ebef1a027bdcd2f9d"
 printf 'ICK driver: %s\n' "$ICK_CC"
 printf 'ICK cc1: %s\n' "$cc1"
 printf 'Host object linker (does not compile C): %s\n' "$HOST_LINKER"
-sha256sum "$ICK_CC" "$cc1" "$output_dir/curve_patch.o"   "$output_dir/test_curve_patch.o" "$output_dir/test_curve_patch"
+sha256sum "$ICK_CC" "$cc1" \
+    "$output_dir/curve_patch.o" "$output_dir/curve_patch_5x5.o" \
+    "$output_dir/test_curve_patch.o" "$output_dir/test_curve_patch_5x5.o" \
+    "$output_dir/test_curve_patch" "$output_dir/test_curve_patch_5x5"
 "$output_dir/test_curve_patch"
-printf '%s\n' 'Sublixel ICK x86_64 C11 compile/object/link/run: PASS'
+"$output_dir/test_curve_patch_5x5"
+printf '%s\n' 'Sublixel 3x3+5x5 ICK x86_64 C11 compile/object/link/run: PASS'
