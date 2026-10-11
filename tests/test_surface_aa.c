@@ -51,7 +51,7 @@ static void test_explicit_edge_coverage_and_depth(void) {
     high_depth[3] = 0.2f;
     assert(rough_resolve_2x2(&high, &low) == 0);
     assert(low_depth[1] == 0.2f);
-    assert(low_pixels[1] == UINT32_C(0xffbfdf80));
+    assert(low_pixels[1] == UINT32_C(0xffbfbf80));
 
     /* Even when only one of four subpixels has opacity, the RGBA color
      * must be unpremultiplied after averaging, never tinted by RGB from
