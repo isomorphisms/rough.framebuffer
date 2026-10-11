@@ -24,12 +24,10 @@ These are sampled footprint integrals, not exact analytic area, opaque 3×3 stam
 
 ## Build and verify
 
-Header: include/sublixel/curve_patch.h. Implementation: src/curve_patch.c. No dynamic allocations; standard C11 plus libm.
+Header: include/sublixel/curve_patch.h. Implementation: src/curve_patch.c. No dynamic allocations; C11 plus libm.
 
-    ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
-    ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
-    HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
-    make test-sublixel
+The default build is a checked Ike `Ikefile`, not GNU Make. A trusted Ike and source-built ICK are required; see [qualification](qualification/README.md).
+Run the repository-root `sh scripts/run-ike.sh test` with the documented `IKE_*` and `ICK_*` environment bindings. Absence or mismatch blocks the build.
 
 Tests cover exact 0, 1/2 and 1 coverage, independent 8×8 counts for a known parabola, quadratic and circle curvature, Bézier derivative evaluation, regular nonlinear reparameterization/reversal, grid ordering, duplicate/split patch union, invalid inputs, overflow and failure without partial output mutation.
 

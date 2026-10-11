@@ -1,9 +1,12 @@
-name: Sublixel + framebuffer ICK-only native C11 qualification
+name: Sublixel ICK compiler + Ike orchestrated C11 qualification
 on:
   pull_request:
     paths:
       - 'sublixel/**'
       - 'Makefile'
+      - 'Ikefile'
+      - 'scripts/run-ike.sh'
+      - 'sublixel/Makefile'
       - 'src/framebuffer.c'
       - 'src/framebuffer.h'
       - 'src/main.c'
@@ -15,6 +18,9 @@ on:
     paths:
       - 'sublixel/**'
       - 'Makefile'
+      - 'Ikefile'
+      - 'scripts/run-ike.sh'
+      - 'sublixel/Makefile'
       - 'src/framebuffer.c'
       - 'src/framebuffer.h'
       - 'src/main.c'
@@ -26,7 +32,7 @@ permissions:
 
 jobs:
   ick-native:
-    name: Source-built ICK x86_64 C11 and native tests
+    name: Source-built ICK and Ike, project-native C tests
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -43,6 +49,14 @@ jobs:
           path: ick-toolchain
           submodules: true
           persist-credentials: false
+      - name: Check out exact owned Ike build orchestrator source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          repository: dilapidated-shed/ike
+          ref: a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0
+          path: ike-toolchain
+          persist-credentials: false
+
       - name: Verify immutable compiler identity
         shell: bash
         run: |
@@ -50,6 +64,7 @@ jobs:
           test "$(git -C ick-toolchain rev-parse HEAD)" = 'c61e448251744a2f40ad743ebef1a027bdcd2f9d'
           test "$(git -C ick-toolchain/gcc rev-parse HEAD)" = '6294f1d9e7536e5ffcde09d1528c918d63abfef5'
           grep -Fxq 'gcc_commit=6294f1d9e7536e5ffcde09d1528c918d63abfef5' ick-toolchain/ick/SOURCE.lock
+          test "$(git -C ike-toolchain rev-parse HEAD)" = 'a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0'
 
       - name: Install explicit ICK stage-zero bootstrap dependencies
         run: |
@@ -93,10 +108,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          make -C ick-toolchain/build -j2 all-gcc
-          make -C ick-toolchain/build install-gcc
+          /usr/bin/make -C ick-toolchain/build -j2 all-gcc
+          /usr/bin/make -C ick-toolchain/build install-gcc
 
-      - name: Compile all framebuffer and Sublixel C sources with ICK; run native tests
+
+      - name: Compile owned Ike from pinned source using ICK
+        shell: bash
+        env:
+          ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          test "$(git -C ike-toolchain rev-parse HEAD)" = 'a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0'
+          mkdir -p .owned/bin
+          "$ICK_CC" -O2 -std=c11 -Wall -Wextra -Werror -pedantic -fPIC \
+            -c ike-toolchain/ike.c -o .owned/ike.o
+          readelf -h .owned/ike.o | grep -q 'Class:.*ELF64'
+          readelf -h .owned/ike.o | grep -q 'Machine:.*Advanced Micro Devices X86-64'
+          "$HOST_LINKER" .owned/ike.o -o .owned/bin/ike
+          test -x .owned/bin/ike
+          sha256sum "$ICK_CC" .owned/ike.o .owned/bin/ike
+
+      - name: Run 3x3 and native framebuffer through pinned Ike and ICK
         shell: bash
         env:
           ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
@@ -104,15 +137,28 @@ jobs:
           HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
         run: |
           set -euo pipefail
-          make test
+          export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
+          export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
+          export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
+          export IKE_RECEIPT="$RUNNER_TEMP/ike-sublixel-$GITHUB_RUN_ID-$$.tsv"
+          sh scripts/run-ike.sh test
+          grep -Fxq $'schema\tike-build-v1' "$IKE_RECEIPT"
+          grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
+          cat "$IKE_RECEIPT"
 
-      - name: Refuse missing ICK instead of choosing the host C compiler
+      - name: Prove absent Ike/ICK and GNU Make fallback are blocked
         shell: bash
         run: |
           set -euo pipefail
-          if env -u ICK_CC -u ICK_SOURCE_DIR -u HOST_LINKER make test > /tmp/no-ick.log 2>&1; then
-            echo "Forbidden host C compiler fallback" >&2
+          if env -u IKE_BIN -u IKE_SOURCE_DIR -u IKE_EXPECTED_SHA256 \
+             -u IKE_RECEIPT sh scripts/run-ike.sh test > /tmp/no-ike.log 2>&1; then
+            echo 'Unexpected build without Ike' >&2
             exit 1
           fi
-          grep -q ICK_CC /tmp/no-ick.log
-          echo "Missing ICK correctly blocked"
+          grep -q 'IKE_BIN' /tmp/no-ike.log
+          if /usr/bin/make test > /tmp/gnu-make.log 2>&1; then
+            echo 'GNU Make unexpectedly accepted the product build' >&2
+            exit 1
+          fi
+          grep -q 'GNU Make is forbidden' /tmp/gnu-make.log
+          echo 'Owned-toolchain missing/fallback controls: PASS'

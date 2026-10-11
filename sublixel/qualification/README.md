@@ -1,51 +1,64 @@
-# Mandatory owned toolchain boundary
+# Mandatory owned build orchestration and compilation
 
-Sublixel is part of rough.framebuffer. All consumer C translation units
-(including test programs and the existing framebuffer CLI) compile exclusively
-through pinned, source-built **ICK**. No GCC/Clang differential build lanes,
-`CC ?= cc` defaults, fallback NDK builds, or reference targets remain in
-the native build recipes.
+The authoritative work orchestrator is **Ike**, repository
+`dilapidated-shed/ike`, source commit `a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0`.
+The checked `Ikefile` invokes `sublixel/qualification/test-ick.sh`.
+`scripts/run-ike.sh` requires absolute paths to the pinned source checkout
+and actual executable, a caller-supplied expected binary SHA-256, and an unused
+receipt path. It binds the current Ikefile SHA-256 to an `ike-build-v1`
+receipt and verifies the selected target, identity, runner mode and PASS
+before claiming success. Neither a PATH-shadowed GNU Make nor any unverified
+Ike-named executable can substitute. A missing owned builder must fail.
 
-The exact source pin is [dilapidated-shed/ick@c61e448251744a2f40ad743ebef1a027bdcd2f9d](https://github.com/dilapidated-shed/ick/tree/c61e448251744a2f40ad743ebef1a027bdcd2f9d),
-with its immutable GCC source reference pinned at
+All five consumer C sources compile exclusively through **source-built ICK**,
+`dilapidated-shed/ick@c61e448251744a2f40ad743ebef1a027bdcd2f9d`,
+with GCC reference submodule
 `6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
-The program `qualification/test-ick.sh` checks both commits, ICK driver
-target and installed cc1 identity. ICK then compiles the following five sources:
+The ICK C11 compile script binds exact ICK source, actual installed cc1
+binary, target triple, output ELF ABI and object/executable checksums.
 
-- `sublixel/src/curve_patch.c`
-- `sublixel/tests/test_curve_patch.c`
-- `src/framebuffer.c`
-- `src/main.c`
-- `tests/test_raster_ick.c`
+- `sublixel/src/curve_patch.c` and `sublixel/tests/test_curve_patch.c`
+- `src/framebuffer.c`, `src/main.c`, and `tests/test_raster_ick.c`
 
-It checks each ELF64 object, links the test executables and the existing
-`build/rough-fb` program, executes both native test suites, and reports
-the selected ICK binary, cc1 and artifact hashes. Missing ICK refuses all
-builds. The CI workflow explicitly exercises this negative condition.
+Both native test programs run from the actual ICK-produced objects; the
+framebuffer CLI is assembled from ICK objects. No direct consumer GCC/Clang
+or NDK compilation jobs remain. The two former reference runs are
+historical only. Root and Sublixel `Makefile` are explicit GNU Make
+refusal stubs. Ike v1 owns the dependency graph without pretending to
+parse GNU Make syntax.
+
+## Required host bindings
 
 ```sh
 ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
 ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
 HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
-make test
+IKE_BIN=/absolute/verified/ike \
+IKE_SOURCE_DIR=/absolute/pinned/ike/checkout \
+IKE_EXPECTED_SHA256=<trusted-64-hex-digest> \
+IKE_RECEIPT=/absolute/unused/receipt.tsv \
+sh scripts/run-ike.sh test
 ```
 
-**Stage-zero and linking exceptions:** ICK remains GCC-derived and is not
-yet self-hosting. Building the owned compiler from its pinned source uses
-system build-essential, including GCC/G++, and the Linux object linker
-uses the separately declared system compiler *only as a linker driver* for
-CRT/libc/libm. It never receives a project source file. This is honest
-ICK-compiled application code, not proof of an all-owned compiler bootstrap
-or all-ICK runtime/linker.
+The CI workflow checks out both compiler and orchestrator at immutable
+commits, builds ICK from its complete owned source, compiles Ike's `ike.c`
+with ICK, then uses the resulting pinned Ike to execute the ICK source
+compiler workload and native tests. Missing-Ike and direct GNU Make
+negative controls must fail.
 
-The earlier GCC/Clang consumer builds are superseded evidence only.
-Legacy Python raster tests are retained in the tree but are not part of
-the native acceptance path; `tests/test_raster_ick.c` exercises the same
-pixel/render boundary with ICK-compiled C. An optional Field Mouse test
-requires an explicit Ithon and has not been qualified under it.
+**Stage-zero / system-link exceptions:** ICK is GCC-derived and not yet
+self-hosting. System GCC/G++ and GNU Make bootstrap the compiler from
+pinned GCC reference plus ICK-owned overlays. A system compiler driver is
+allowed solely for final CRT/libc/libm *linking of already-produced ICK
+objects*, including the ICK-built Ike executable; it never receives a
+consumer `.c` file. These exceptions are explicit and audited, not an
+all-owned bootstrapping claim. POSIX shell is an explicitly bounded recipe
+transport, not a competing build orchestrator. The runner refuses an
+unqualified `IKE_RECIPE_RUNNER`.
 
-ICKY is not yet integrated as ICK's full C parser. IKE, Ithon and ILua
-are selected only for the stages they actually support; they must never
-be asserted to support this C11 code without execution evidence. Android
-packaging, phone runtime verification, registered Flexible Pipes dispatch
-and independent ai-ci acceptance remain separate, currently unmet gates.
+**Open:** ICKY is not yet the general C parser; Ithon/ILua remain
+language-specific; historical Python fixture scripts are not default
+acceptance; Android compiler/sysroot/APK/device runtime, registered
+Flexible Pipes dispatch and independent ai-ci acceptance remain separate.
+Do not equate creation of an issue, an Ikefile, a hosted job or a PR with
+those missing gates.

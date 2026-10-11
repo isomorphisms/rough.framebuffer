@@ -1,0 +1,10 @@
+# Ike's literal v1 grammar: no GNU Make variables or implicit rules.
+# Project code is built only by ICK inside the checked recipe.
+all depends on sublixel/qualification/test-ick.sh src/framebuffer.c src/main.c
+    sh sublixel/qualification/test-ick.sh
+
+test depends on sublixel/qualification/test-ick.sh sublixel/tests/test_curve_patch.c tests/test_raster_ick.c
+    sh sublixel/qualification/test-ick.sh
+
+clean depends on Ikefile
+    rm -rf build sublixel/build
