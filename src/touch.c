@@ -87,7 +87,12 @@ int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
     if (dx * dx + dy * dy >= threshold2) state->moved = 1;
     int changed = 0;
     if (state->moved) {
-        double angle = normalized_angle(state->anchor_yaw +
+        /* Object-in-hand convention: with camera +z pointing inward and
+         * x_cam = cos(yaw)*x + sin(yaw)*z, the near half has z < 0.
+         * A right drag must move that near half right, so yaw decreases.
+         * Do not use camera-orbit sign here; it turns the far half instead.
+         * Cross-viewer defect class: ai-ci #252. */
+        double angle = normalized_angle(state->anchor_yaw -
                         dx * (180.0 / (double)state->width));
         double distance = bounded(state->anchor_distance +
                           dy * (3.0 / (double)state->height),
