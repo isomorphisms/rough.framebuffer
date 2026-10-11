@@ -202,6 +202,20 @@ static point3 analytic_unit_normal(rough_surface_shape shape, double u, double v
     return result;
 }
 
+int rough_surface_unit_normal(rough_surface_shape shape,
+                              double u, double v, double xyz[3]) {
+    if (!xyz || (shape != ROUGH_SURFACE_TORUS &&
+                 shape != ROUGH_SURFACE_ENNEPER) ||
+        !isfinite(u) || !isfinite(v)) return -1;
+    point3 normal = analytic_unit_normal(shape, u, v);
+    if (!isfinite(normal.x) || !isfinite(normal.y) ||
+        !isfinite(normal.z)) return -1;
+    xyz[0] = normal.x;
+    xyz[1] = normal.y;
+    xyz[2] = normal.z;
+    return 0;
+}
+
 static smooth_camera_vertex smooth_corner(point3 camera,
                                           rough_surface_shape shape,
                                           double u, double v,
