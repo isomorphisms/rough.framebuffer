@@ -103,3 +103,16 @@ This is a draft stacked follower on
 [rough.framebuffer PR #3](https://github.com/isomorphisms/rough.framebuffer/pull/3),
 from [Flexible Pipes job envelope #74](https://github.com/isomorphisms/flexible-pipes/issues/74).
 No merge, release or device acceptance is implied.
+
+## C67 Sublixel 3×3/5×5 test-only diagnostic build
+
+A **separate, unmerged candidate** built from the existing C67 two-depth-sample-per-axis AA renderer plus exact Sublixel 3×3/5×5 source snapshots adds two **magnified curve-coverage test panels** near the top of the screen:
+
+- Left cyan **3x3** = existing quadratic local curve model in the center of a 5×5 grid (outside the 3×3 support remains white).
+- Right magenta **5x5** = cubic asymmetric local curve model using all 25 cells, each cell's 8×8 samples averaged into fractional coverage.
+
+The shared local frame uses **T=(4/5,3/5)** (about 37° down toward the right in screen coordinates) and N=(-3/5,4/5), so the 3×3 panel displays a diagonal instead of the former near-horizontal stripe. In these oblique local coordinates the graph remains `v=u²/4+u³/16`, half-width `3/16`, `valid_u=3`. The 3×3 API ignores the cubic term by design; the 5×5 API retains it. A new exact integer-rational pixel/coverage oracle verifies both painted grids, including the slope and their different support footprints. The panels show the **actual C11 Sublixel coverage calls**, magnified for phone inspection, not an approximated photograph or postprocessed blur.
+
+The existing torus/Enneper rendering continues below the panels, including native 2×2 per-sample depth/coverage, front-side-following horizontal drag, vertical zoom, tap shape switching, and the prior RGBA presentation. The 5×5 panel **does not anti-alias the 3D triangle edges** and should not be judged for that. Users can report physical C67 installation, presence/layout of both grids, aliasing in the preexisting surfaces, drag direction, and responsiveness independently. The same proposed test-only package ID/signer is reused for updating the existing APK; no new key is generated.
+
+This is a device diagnostic from [Sublixel PR #8](https://github.com/isomorphisms/rough.framebuffer/pull/8), [C67 renderer PR #7](https://github.com/isomorphisms/rough.framebuffer/pull/7), and [Flexible Pipes #77](https://github.com/isomorphisms/flexible-pipes/issues/77). It is not merged to either parent or a registered dispatch/ai-ci acceptance. Android C67 build uses the explicit NDK path for the still-unqualified ICK Android NativeActivity ABI closure and does not change ICK's mandatory compiler lane for library source qualification.
