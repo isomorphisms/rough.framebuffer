@@ -37,7 +37,19 @@ build/test-surface-aa: tests/test_surface_aa.c src/surface_aa.c src/surface_aa.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc tests/test_surface_aa.c src/surface_aa.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present build/test-rotation-grab build/test-surface-aa
+# Reference-only C11 visual probe for the test APK (not ICK acceptance).
+build/test-sublixel-demo-reference: tests/test_sublixel_demo.c src/sublixel_demo.c src/sublixel_demo.h sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c sublixel/include/sublixel/curve_patch.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc -Isublixel/include tests/test_sublixel_demo.c src/sublixel_demo.c sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c -o $@ $(LDLIBS)
+
+# Host differential check; product ICK compilation is in Sublixel PR #8.
+build/test-sublixel5-reference: sublixel/tests/test_curve_patch_5x5.c sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c sublixel/include/sublixel/curve_patch.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isublixel/include sublixel/tests/test_curve_patch_5x5.c sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c -o $@ $(LDLIBS)
+
+test: build/test-sublixel-demo-reference build/test-sublixel5-reference build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present build/test-rotation-grab build/test-surface-aa
+	./build/test-sublixel-demo-reference
+	./build/test-sublixel5-reference
 	./build/test-api
 	./build/test-surface
 	./build/test-touch
