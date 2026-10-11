@@ -79,10 +79,16 @@ int rough_sublixel_demo_draw(rough_framebuffer *frame,
     unsigned right_x = left_x + 5u * side + padding;
     unsigned top_y = 29u;
 
+    /* A real oblique tangent makes the 3x3's local inclination visible.
+     * This is the SAME oriented curve jet in both panels:
+     * T=(4/5,3/5), N=(-3/5,4/5), v=u^2/4+u^3/16.
+     * The 3x3 API deliberately drops a3; the 5x5 API retains it.
+     * Use rational 3-4-5 components so the visual test has an exact
+     * independent integer subpixel oracle. */
     cp_curve_patch cubic;
     cp_status status = cp_patch_from_jet3(&cubic,
-        (cp_vec2){0.0, 0.0}, (cp_vec2){1.0, 0.0},
-        (cp_vec2){0.0, 0.5}, (cp_vec2){0.0, 0.375},
+        (cp_vec2){0.0, 0.0}, (cp_vec2){0.8, 0.6},
+        (cp_vec2){-0.3, 0.4}, (cp_vec2){-0.225, 0.3},
         3.0 / 16.0, 3.0);
     if (status != CP_OK) return -1;
     double quadratic[3][3], cubic_grid[5][5];
