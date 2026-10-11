@@ -56,6 +56,20 @@ jobs:
           fi
           grep -Fq 'FRONT_HEMISPHERE_WRONG_DIRECTION:' build/bad_backside.log
           echo 'BACKSIDE_ROTATION_MUTANT_KILLED: near-side grip direction enforced'
+      - name: Reject the old one-sample contour renderer
+        if: matrix.compiler == 'gcc'
+        run: |
+          set -eu
+          sed 's/return rough_resolve_2x2(scratch, destination);/return rough_draw_surface(destination, shape, angle_degrees, camera_distance);/' src/surface_aa.c > build/single_sample_mutant.c
+          grep -Fq 'return rough_draw_surface(destination, shape, angle_degrees, camera_distance);' build/single_sample_mutant.c
+          gcc -O2 -std=c11 -Wall -Wextra -Werror -pedantic -Isrc tests/test_surface_aa.c build/single_sample_mutant.c src/surface.c src/framebuffer.c -o build/aa-single-sample-mutant -lm
+          if (ulimit -c 0; ./build/aa-single-sample-mutant > build/bad_single_sample.log 2>&1); then
+            echo 'AA false pass: old center-sample rendering accepted' >&2
+            exit 1
+          fi
+          grep -Fq 'changed > 20u' build/bad_single_sample.log
+          echo 'AA_SUBPIXEL_MUTANT_KILLED'
+
       - name: Render inspectable frames
         if: matrix.compiler == 'gcc'
         run: |
