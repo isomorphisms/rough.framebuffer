@@ -1,22 +1,67 @@
-# ICK compiler qualification and fallback policy
+# Mandatory owned build orchestration and compilation
 
-Sublixel is an ordinary C11 geometry library; ICK (not a host GCC/Clang executable) is the designated production C compiler. The earlier test run on PR #6 was a **reference compiler** check only.
+The authoritative work orchestrator is **Ike**, repository
+`dilapidated-shed/ike`, source commit `a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0`.
+The checked `Ikefile` invokes `sublixel/qualification/test-ick.sh`.
+`scripts/run-ike.sh` requires absolute paths to the pinned source checkout
+and actual executable, a caller-supplied expected binary SHA-256, and an unused
+receipt path. It binds the current Ikefile SHA-256 to an `ike-build-v1`
+receipt and verifies the selected target, identity, runner mode and PASS
+before claiming success. Neither a PATH-shadowed GNU Make nor any unverified
+Ike-named executable can substitute. A missing owned builder must fail.
 
-The `test-ick` target uses the complete **owned ICK** C frontend from [dilapidated-shed/ick](https://github.com/dilapidated-shed/ick) at source commit `c61e448251744a2f40ad743ebef1a027bdcd2f9d`, with the GCC reference at `6294f1d9e7536e5ffcde09d1528c918d63abfef5`. The workflow materializes its source under ICK's own `ick/materialize.sh`, builds the native x86_64 C compiler, authenticates the installed `cc1`, and compiles **both curve-library translation units and both test translation units** using the ICK driver exclusively. The compiler's own hosted bootstrap uses build-essential; those host compilers **do not compile Sublixel source**.
+All seven consumer C sources compile exclusively through **source-built ICK**,
+`dilapidated-shed/ick@c61e448251744a2f40ad743ebef1a027bdcd2f9d`,
+with GCC reference submodule
+`6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
+The ICK C11 compile script binds exact ICK source, actual installed cc1
+binary, target triple, output ELF ABI and object/executable checksums.
 
-After ICK emits ELF64 x86_64 objects, the named Linux host linker consumes those objects with libc/libm and runs the **two independent 3×3 and 5×5 test executables**. This is **ICK C object generation and Linux functional validation**, not an ICK Android sysroot, ICK-only runtime/linker or device APK qualification. Toolchain paths are mandatory and missing ICK always fails closed; there is no environment auto-fallback. The driver, `cc1`, object and executable hashes are printed as receipt material.
+- `sublixel/src/curve_patch.c` and `sublixel/tests/test_curve_patch.c` (quadratic 3×3)
+- `sublixel/src/curve_patch_5x5.c` and `sublixel/tests/test_curve_patch_5x5.c` (cubic 5×5)
+- `src/framebuffer.c`, `src/main.c`, and `tests/test_raster_ick.c`
 
-To execute after separately building the pinned compiler:
+All three native test programs run from the actual ICK-produced objects; the
+framebuffer CLI is assembled from ICK objects. No direct consumer GCC/Clang
+or NDK compilation jobs remain. The former GCC/Clang reference runs are
+historical only. Root and Sublixel `Makefile` are explicit GNU Make
+refusal stubs. Ike v1 owns the dependency graph without pretending to
+parse GNU Make syntax.
+
+## Required host bindings
 
 ```sh
-ICK_CC=/absolute/path/to/ick/stage/bin/x86_64-linux-gnu-gcc \
-ICK_SOURCE_DIR=/absolute/path/to/ick/checkout \
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
 HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
-make test-sublixel
+IKE_BIN=/absolute/verified/ike \
+IKE_SOURCE_DIR=/absolute/pinned/ike/checkout \
+IKE_EXPECTED_SHA256=<trusted-64-hex-digest> \
+IKE_RECEIPT=/absolute/unused/receipt.tsv \
+sh scripts/run-ike.sh test
 ```
 
-`make -C sublixel test-reference` is deliberately a **diagnostic-only** GCC/Clang control and never substitutes for `test-ick`. The existing rough.framebuffer renderer retains its own separate C-reference tests.
+The CI workflow checks out both compiler and orchestrator at immutable
+commits, builds ICK from its complete owned source, compiles Ike's `ike.c`
+with ICK, then uses the resulting pinned Ike to execute the ICK source
+compiler workload and native tests. Missing-Ike and direct GNU Make
+negative controls must fail.
 
-**Open qualifications:** ICKY is not integrated as a replacement general C source parser (see ICK PR #89); this code uses ordinary C11 tokens. Android source/header, ELF32 A32/ARMv7, C67 AArch64, linker/sysroot, ABI and physical runtime acceptance remain separate and are not inferred from Linux x86_64 test success. The ICK x86_64 lane does not itself merge the work; Flexible Pipes registered dispatch and independent ai-ci remain unsatisfied.
+**Stage-zero / system-link exceptions:** ICK is GCC-derived and not yet
+self-hosting. System GCC/G++ and GNU Make bootstrap the compiler from
+pinned GCC reference plus ICK-owned overlays. A system compiler driver is
+allowed solely for final CRT/libc/libm *linking of already-produced ICK
+objects*, including the ICK-built Ike executable; it never receives a
+consumer `.c` file. These exceptions are explicit and audited, not an
+all-owned bootstrapping claim. POSIX shell is an explicitly bounded recipe
+transport, not a competing build orchestrator. The runner refuses an
+unqualified `IKE_RECIPE_RUNNER`.
 
-The 5×5 extension adds parametric 3-jets and an independently counted cubic coverage oracle. `test-ick.sh` compiles both curve-library units and both test units with the pinned ICK driver and checks the four ELF objects, executables and content hashes. This does not establish Android/physical rendering acceptance.
+**Open:** ICKY is not yet the general C parser; Ithon/ILua remain
+language-specific; historical Python fixture scripts are not default
+acceptance; Android compiler/sysroot/APK/device runtime, registered
+Flexible Pipes dispatch and independent ai-ci acceptance remain separate.
+Do not equate creation of an issue, an Ikefile, a hosted job or a PR with
+those missing gates.
+
+This stacked extension preserves 3×3 API behavior and adds the independent 5×5 cubic coverage suite under the **same** pinned Ike/ICK build. Inherited 5×5 GCC/Clang differential and GNU Make build recipes have been superseded, not preserved as alternative product paths. The 5×5 native x86_64 Linux ICK receipt cannot establish Android compilation or a device-visible antialiasing improvement.
