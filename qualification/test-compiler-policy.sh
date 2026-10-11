@@ -34,6 +34,20 @@ require_failed_receipt() {
     grep -Fqx "$(printf 'final_result\tFAIL')" "$file"
 }
 
+# Execute an ICK-specific lexical/semantic proof, not just --version.
+# Ordinary stock GCC cannot parse ←, ×, ÷; the pinned ICK must compile
+# the maintained exact ICK source fixture with its own cc1, then run it.
+probe_src="$ICK_SOURCE_DIR/ick/source/gcc/testsuite/gcc.dg/ick-division-glyph.c"
+test -s "$probe_src" || { echo "Missing pinned ICK glyph probe" >&2; exit 1; }
+"$ICK_CC" -O2 -std=c11 -Wall -Wextra -Werror -pedantic -fPIC \
+    -c "$probe_src" -o "$tmp/ick-dialect.o"
+readelf -h "$tmp/ick-dialect.o" | grep -q 'Class:.*ELF64'
+readelf -h "$tmp/ick-dialect.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
+"$HOST_LINKER" "$tmp/ick-dialect.o" -o "$tmp/ick-dialect"
+"$tmp/ick-dialect"
+sha256sum "$ICK_CC" "$tmp/ick-dialect.o" "$tmp/ick-dialect"
+echo "Pinned ICK Unicode assignment/multiplication/division: PASS"
+
 # Missing or substituted orchestrator fails without compiling any project C.
 expect_block no-ike env -u IKE_BIN sh "$root/scripts/run-ike.sh" test
 require_text no-ike IKE_BIN

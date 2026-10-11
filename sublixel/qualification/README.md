@@ -76,3 +76,5 @@ Ike recipe interpreters, and GNU Make product entrypoints. A real second
 positive rebuild verifies that `CC=/usr/bin/gcc` does not override ICK.
 Its own fresh `ike-build-v1` receipt is separate from the code test receipt.
 No source compiler fallback is added. Android runtime/ABI gates remain open.
+
+The policy suite additionally compiles and executes ICK's own pinned Unicode `← × ÷` semantic fixture through the actual ICK frontend, so a stock GCC binary placed under an ICK-like pathname cannot satisfy the acceptance gate merely by claiming the expected target triple. This is a real source/semantics discriminator rather than a string/identity check alone.
