@@ -6,6 +6,7 @@ on:
       - 'Makefile'
       - 'Ikefile'
       - 'scripts/run-ike.sh'
+      - 'qualification/**'
       - 'sublixel/Makefile'
       - 'src/framebuffer.c'
       - 'src/framebuffer.h'
@@ -20,6 +21,7 @@ on:
       - 'Makefile'
       - 'Ikefile'
       - 'scripts/run-ike.sh'
+      - 'qualification/**'
       - 'sublixel/Makefile'
       - 'src/framebuffer.c'
       - 'src/framebuffer.h'
@@ -178,3 +180,20 @@ jobs:
             grep -Fq 'BLOCKED: compiler is not the pinned ICK installation' /tmp/fake-ick.log
           done
           echo 'Stock and fake ICK drivers correctly rejected'
+
+      - name: Verify ICK and Ike substitution negatives through actual Ike
+        shell: bash
+        env:
+          ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
+          ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
+          export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
+          export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
+          export IKE_RECEIPT="$RUNNER_TEMP/ike-policy-$GITHUB_RUN_ID-$$.tsv"
+          sh scripts/run-ike.sh policy-check
+          grep -Fxq $'schema\tike-build-v1' "$IKE_RECEIPT"
+          grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
+          cat "$IKE_RECEIPT"

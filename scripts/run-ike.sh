@@ -4,9 +4,9 @@
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 target=all
-if [ "$#" -gt 1 ]; then echo "usage: $0 [all|test|clean]" >&2; exit 2; fi
+if [ "$#" -gt 1 ]; then echo "usage: $0 [all|test|clean|policy-check]" >&2; exit 2; fi
 if [ "$#" -eq 1 ]; then target=$1; fi
-case "$target" in all|test|clean) ;; *) echo "unsupported Ike target" >&2; exit 2 ;; esac
+case "$target" in all|test|clean|policy-check) ;; *) echo "unsupported Ike target" >&2; exit 2 ;; esac
 
 : "${IKE_BIN:?IKE_BIN must identify the verified owned Ike executable}"
 : "${IKE_SOURCE_DIR:?IKE_SOURCE_DIR must name the pinned Ike source checkout}"
@@ -44,11 +44,42 @@ identity=sha256:$ikfilehash
 
 hex_string() { printf %s "$1" | od -An -tx1 | tr -d ' \n'; }
 tab=$(printf '\t')
-grep -Fqx "schema${tab}ike-build-v1" "$IKE_RECEIPT"
-grep -Fqx "final_result${tab}PASS" "$IKE_RECEIPT"
-grep -Fqx "recipe_runner_mode${tab}posix-system" "$IKE_RECEIPT"
-grep -Fqx "selected_target_hex${tab}$(hex_string "$target")" "$IKE_RECEIPT"
-grep -Fqx "ikefile_identity_hex${tab}$(hex_string "$identity")" "$IKE_RECEIPT"
+case "$target" in
+    all|test) expected_recipe='sh sublixel/qualification/test-ick.sh' ;;
+    clean) expected_recipe='rm -rf build sublixel/build' ;;
+    policy-check) expected_recipe='sh qualification/test-compiler-policy.sh' ;;
+esac
+hex_target=$(hex_string "$target")
+hex_identity=$(hex_string "$identity")
+hex_recipe=$(hex_string "$expected_recipe")
+hex_runner=$(hex_string 'POSIX-system()')
+
+# A final_result=PASS with zero executed rules is not a build. Validate
+# the complete eight-line v1 receipt, including exactly one real recipe
+# execution at exit 0. Reject extra rows, skipped/cached targets and
+# receipts whose target or recipe was substituted.
+match_line() {
+    expected_line=$1
+    if ! IFS= read -r actual_line || [ "$actual_line" != "$expected_line" ]; then
+        echo "Ike recipe receipt mismatch: $IKE_RECEIPT" >&2
+        exit 3
+    fi
+}
+{
+    match_line "schema${tab}ike-build-v1"
+    match_line "selected_target_hex${tab}$hex_target"
+    match_line "ikefile_identity_hex${tab}$hex_identity"
+    match_line "recipe_runner_mode${tab}posix-system"
+    match_line "recipe_runner_identity_hex${tab}$hex_runner"
+    match_line "rule${tab}0${tab}$hex_target"
+    match_line "recipe${tab}1${tab}$hex_target${tab}$hex_recipe${tab}0"
+    match_line "final_result${tab}PASS"
+    extra_line=
+    if IFS= read -r extra_line || [ -n "$extra_line" ]; then
+        echo "Ike recipe receipt mismatch: extra trailing data" >&2
+        exit 3
+    fi
+} < "$IKE_RECEIPT"
 echo "Pinned Ike: $ike_pin"
 echo "Ike ELF SHA256: $actual"
 echo "Ikefile SHA256: $ikfilehash"

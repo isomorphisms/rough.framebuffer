@@ -64,3 +64,17 @@ Do not equate creation of an issue, an Ikefile, a hosted job or a PR with
 those missing gates.
 
 This stacked extension preserves 3×3 API behavior and adds the independent 5×5 cubic coverage suite under the **same** pinned Ike/ICK build. Inherited 5×5 GCC/Clang differential and GNU Make build recipes have been superseded, not preserved as alternative product paths. The 5×5 native x86_64 Linux ICK receipt cannot establish Android compilation or a device-visible antialiasing improvement.
+
+## Independent policy proposal
+
+A separate stacked policy-acceptance candidate adds a machine-readable
+`qualification/compiler-gaps.tsv` and an **Ike-run** policy target:
+`sh scripts/run-ike.sh policy-check`. The policy target exercises real,
+fail-closed behavior against missing Ike/ICK, stock GCC masquerading as ICK,
+success-only binaries, an altered Ike digest, reused receipts, unapproved
+Ike recipe interpreters, and GNU Make product entrypoints. A real second
+positive rebuild verifies that `CC=/usr/bin/gcc` does not override ICK.
+Its own fresh `ike-build-v1` receipt is separate from the code test receipt.
+No source compiler fallback is added. Android runtime/ABI gates remain open.
+
+The policy suite additionally compiles and executes ICK's own pinned Unicode `← × ÷` semantic fixture through the actual ICK frontend, so a stock GCC binary placed under an ICK-like pathname cannot satisfy the acceptance gate merely by claiming the expected target triple. This is a real source/semantics discriminator rather than a string/identity check alone.
