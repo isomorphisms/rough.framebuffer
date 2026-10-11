@@ -174,16 +174,145 @@ static int emit_face(FILE *output, rough_framebuffer *target,
     return 0;
 }
 
+/* Smooth per-fragment lighting uses closed-form unit normals, not face
+ * normals inferred from coarse triangles. The torus normal equals its
+ * parametrization's normalized du x dv. Enneper's unit normal is
+ * (-2u, 2v, 1-u^2-v^2)/(1+u^2+v^2).
+ *
+ * As in the historical flat renderer, positive camera z points inward.
+ * Positions, normals and palette are kept in explicit camera/parameter
+ * spaces; normal transformation has rotation only, NEVER translation.
+ */
+typedef struct {
+    point3 camera;
+    point3 normal;
+    double base_red, base_green, base_blue;
+} smooth_camera_vertex;
+
+static point3 analytic_unit_normal(rough_surface_shape shape, double u, double v) {
+    if (shape == ROUGH_SURFACE_TORUS) {
+        point3 result = {cos(u) * cos(v), sin(u) * cos(v), sin(v)};
+        return result;
+    }
+    double square = u * u + v * v;
+    double denominator = 1.0 + square;
+    point3 result = {-2.0 * u / denominator,
+                      2.0 * v / denominator,
+                     (1.0 - square) / denominator};
+    return result;
+}
+
+static smooth_camera_vertex smooth_corner(point3 camera,
+                                          rough_surface_shape shape,
+                                          double u, double v,
+                                          double sine, double cosine) {
+    point3 normal = analytic_unit_normal(shape, u, v);
+    smooth_camera_vertex result;
+    result.camera = camera;
+    result.normal = to_camera(normal, sine, cosine, 0.0);
+    /* Integer-frequency torus harmonics identify both parameter seams. */
+    double warm = 0.5 + 0.5 * sin(u);
+    double cool = 0.5 + 0.5 * cos(2.0 * v);
+    result.base_red = 55.0 + 165.0 * warm;
+    result.base_green = 65.0 + 155.0 * cool;
+    result.base_blue = 75.0 + 165.0 * (1.0 - warm);
+    return result;
+}
+
+static smooth_camera_vertex interpolate_smooth(smooth_camera_vertex a,
+                                                 smooth_camera_vertex b,
+                                                 double t) {
+    smooth_camera_vertex result;
+    result.camera = interpolate(a.camera, b.camera, t);
+    result.normal = interpolate(a.normal, b.normal, t);
+    result.base_red = a.base_red + t * (b.base_red - a.base_red);
+    result.base_green = a.base_green + t * (b.base_green - a.base_green);
+    result.base_blue = a.base_blue + t * (b.base_blue - a.base_blue);
+    return result;
+}
+
+static unsigned clip_near_smooth(const smooth_camera_vertex input[3],
+                                 smooth_camera_vertex output[4]) {
+    unsigned count = 0;
+    smooth_camera_vertex previous = input[2];
+    int previous_inside = previous.camera.z >= SURFACE_NEAR;
+    for (unsigned i = 0; i < 3u; ++i) {
+        smooth_camera_vertex current = input[i];
+        int current_inside = current.camera.z >= SURFACE_NEAR;
+        if (current_inside != previous_inside) {
+            /* The same outside->inside interpolation convention as clip_near:
+             * position and every material/normal attribute cross precisely
+             * the same camera-space clipping plane, before projection. */
+            smooth_camera_vertex outside = current_inside ? previous : current;
+            smooth_camera_vertex inside = current_inside ? current : previous;
+            double t = (SURFACE_NEAR - outside.camera.z) /
+                       (inside.camera.z - outside.camera.z);
+            smooth_camera_vertex intersection =
+                interpolate_smooth(outside, inside, t);
+            intersection.camera.z = SURFACE_NEAR;
+            output[count++] = intersection;
+        }
+        if (current_inside) output[count++] = current;
+        previous = current;
+        previous_inside = current_inside;
+    }
+    return count;
+}
+
+static rough_smooth_vertex projected_smooth(smooth_camera_vertex source,
+                                             unsigned width, unsigned height) {
+    projected_vertex p = project(source.camera, width, height);
+    rough_smooth_vertex vertex = {
+        {p.x, p.y, p.depth}, 1.0 / source.camera.z,
+        source.normal.x, source.normal.y, source.normal.z,
+        source.base_red, source.base_green, source.base_blue
+    };
+    return vertex;
+}
+
+static int emit_smooth_face(rough_framebuffer *target,
+                            const smooth_camera_vertex face[3],
+                            unsigned width, unsigned height) {
+    /* Preserve the flat path's degenerate-face elimination, so both color
+     * modes make the same geometric/depth coverage decisions. */
+    point3 flat_normal = cross(difference(face[1].camera, face[0].camera),
+                               difference(face[2].camera, face[0].camera));
+    double length = sqrt(flat_normal.x * flat_normal.x +
+                         flat_normal.y * flat_normal.y +
+                         flat_normal.z * flat_normal.z);
+    if (!(length > 1e-12) || !isfinite(length)) return 0;
+
+    smooth_camera_vertex clipped[4];
+    unsigned count = clip_near_smooth(face, clipped);
+    for (unsigned i = 1u; i + 1u < count; ++i) {
+        projected_vertex a = project(clipped[0].camera, width, height);
+        projected_vertex b = project(clipped[i].camera, width, height);
+        projected_vertex c = project(clipped[i + 1u].camera, width, height);
+        double area = (b.x - a.x) * (c.y - a.y) -
+                      (b.y - a.y) * (c.x - a.x);
+        if (!isfinite(area)) return -1;
+        if (fabs(area) <= 1e-10) continue;
+        if (rough_fill_smooth_triangle(
+                target,
+                projected_smooth(clipped[0], width, height),
+                projected_smooth(clipped[i], width, height),
+                projected_smooth(clipped[i + 1u], width, height))) return -1;
+    }
+    return 0;
+}
+
 static int walk_surface(FILE *output, rough_framebuffer *target,
                         rough_surface_shape shape, double degrees,
-                        unsigned width, unsigned height, double camera_distance) {
+                        unsigned width, unsigned height, double camera_distance,
+                        int smooth) {
     if ((!output && (!target || !target->pixels || target->width != width ||
                       target->height != height)) ||
         (shape != ROUGH_SURFACE_TORUS && shape != ROUGH_SURFACE_ENNEPER) ||
         !isfinite(degrees) || !isfinite(camera_distance) ||
         !(camera_distance > 0.0) || camera_distance > 100.0 ||
         !width || !height ||
-        width > SURFACE_MAX_DIMENSION || height > SURFACE_MAX_DIMENSION) return -1;
+        width > SURFACE_MAX_DIMENSION || height > SURFACE_MAX_DIMENSION ||
+        (smooth && (output || !target || !target->depth))) return -1;
 
     const double pi = 3.14159265358979323846264338327950288;
     double yaw = fmod(degrees, 360.0) * (pi / 180.0);
@@ -219,8 +348,30 @@ static int walk_surface(FILE *output, rough_framebuffer *target,
             };
             point3 first[3] = {corners[0], corners[1], corners[2]};
             point3 second[3] = {corners[0], corners[2], corners[3]};
-            if (emit_face(output, target, first, middle_u, middle_v, width, height) ||
-                emit_face(output, target, second, middle_u, middle_v, width, height)) return -1;
+            if (smooth) {
+                /* Same four camera-space positions as the historical mesh,
+                 * now with shared analytic normals/material at each corner. */
+                smooth_camera_vertex vertex[4] = {
+                    smooth_corner(corners[0], shape, u0, v0, sine, cosine),
+                    smooth_corner(corners[1], shape, u1, v0, sine, cosine),
+                    smooth_corner(corners[2], shape, u1, v1, sine, cosine),
+                    smooth_corner(corners[3], shape, u0, v1, sine, cosine)
+                };
+                smooth_camera_vertex first_smooth[3] = {
+                    vertex[0], vertex[1], vertex[2]
+                };
+                smooth_camera_vertex second_smooth[3] = {
+                    vertex[0], vertex[2], vertex[3]
+                };
+                if (emit_smooth_face(target, first_smooth, width, height) ||
+                    emit_smooth_face(target, second_smooth, width, height))
+                    return -1;
+            } else {
+                if (emit_face(output, target, first, middle_u, middle_v,
+                              width, height) ||
+                    emit_face(output, target, second, middle_u, middle_v,
+                              width, height)) return -1;
+            }
         }
     }
     return output && ferror(output) ? -1 : 0;
@@ -229,12 +380,21 @@ static int walk_surface(FILE *output, rough_framebuffer *target,
 int rough_emit_surface(FILE *output, rough_surface_shape shape, double degrees,
                        unsigned width, unsigned height, double camera_distance) {
     if (!output) return -1;
-    return walk_surface(output, NULL, shape, degrees, width, height, camera_distance);
+    return walk_surface(output, NULL, shape, degrees, width, height,
+                        camera_distance, 0);
 }
 
 int rough_draw_surface(rough_framebuffer *target, rough_surface_shape shape,
                        double degrees, double camera_distance) {
     if (!target || !target->pixels) return -1;
     return walk_surface(NULL, target, shape, degrees,
-                        target->width, target->height, camera_distance);
+                        target->width, target->height, camera_distance, 0);
+}
+
+int rough_draw_surface_smooth(rough_framebuffer *target,
+                              rough_surface_shape shape,
+                              double degrees, double camera_distance) {
+    if (!target || !target->pixels || !target->depth) return -1;
+    return walk_surface(NULL, target, shape, degrees,
+                        target->width, target->height, camera_distance, 1);
 }
