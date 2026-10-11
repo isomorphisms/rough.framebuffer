@@ -77,7 +77,9 @@ static int accumulate_stroke(void) {
     return 1;
 }
 
-static uint64_t checksum_plane(const uint64_t plane[HEIGHT][WIDTH]) {
+/* C11 rejects implicit qualification of pointers to arrays of const elements;
+ * these internal readers never write the caller-owned mutable coverage planes. */
+static uint64_t checksum_plane(uint64_t plane[HEIGHT][WIDTH]) {
     /* FNV-1a over individual occupied bits, serialized in little-endian
      * order independent of the native machine's byte representation. */
     uint64_t hash = UINT64_C(14695981039346656037);
@@ -92,7 +94,7 @@ static uint64_t checksum_plane(const uint64_t plane[HEIGHT][WIDTH]) {
     return hash;
 }
 
-static int inspect_slant(const uint64_t plane[HEIGHT][WIDTH], const char *name) {
+static int inspect_slant(uint64_t plane[HEIGHT][WIDTH], const char *name) {
     unsigned populated = 0;
     int first_x = WIDTH, last_x = -1;
     int first_y = HEIGHT, last_y = -1;
