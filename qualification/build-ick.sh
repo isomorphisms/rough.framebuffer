@@ -3,8 +3,8 @@
 # HOST_LINKER receives object files only; it never compiles product C.
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
-# A failed mandatory ICK build must never leave a previous product executable.
-rm -f "$root/build/rough-fb"
+# FORCE in Makefile revalidates on every invocation; an old executable cannot
+# satisfy make by its timestamp. Failed attempts preserve the last good artifact.
 
 : "${ICK_CC:?BLOCKED: ICK_CC must name the pinned source-built ICK compiler}"
 : "${ICK_SOURCE_DIR:?BLOCKED: ICK_SOURCE_DIR must name the pinned ICK checkout}"
@@ -44,7 +44,13 @@ for name in main framebuffer; do
     readelf -h "$root/build/ick/$name.o" | grep -q 'Class:.*ELF64'
     readelf -h "$root/build/ick/$name.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
 done
-"$HOST_LINKER" "$root/build/ick/main.o" "$root/build/ick/framebuffer.o" -lm -o "$root/build/rough-fb"
+# Link to a temporary path; publish only an entirely linked ICK product.
+pending="$root/build/ick/rough-fb.pending"
+rm -f "$pending"
+trap 'rm -f "$pending"' EXIT HUP INT TERM
+"$HOST_LINKER" "$root/build/ick/main.o" "$root/build/ick/framebuffer.o" -lm -o "$pending"
+mv "$pending" "$root/build/rough-fb"
+trap - EXIT HUP INT TERM
 printf 'PRODUCT_COMPILER=ICK\nICK_SOURCE=%s\nICK_DRIVER=%s\nICK_CC1=%s\nOBJECT_ONLY_LINKER=%s\n' \
     'c61e448251744a2f40ad743ebef1a027bdcd2f9d' "$ICK_CC" "$cc1" "$HOST_LINKER"
 sha256sum "$ICK_CC" "$cc1" "$root/build/ick/main.o" "$root/build/ick/framebuffer.o" "$root/build/rough-fb"
