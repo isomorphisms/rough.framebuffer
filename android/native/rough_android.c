@@ -19,17 +19,29 @@
 #include "framebuffer.h"
 #include "present.h"
 #include "surface.h"
+#include "surface_aa.h"
 #include "touch.h"
 
 #define ROUGH_TAG "RoughFrameArt"
 #define ROUGH_MAX_WINDOW 16384
 #define ROUGH_MAX_RENDER_PIXELS 180000u
 
+/* A64 C67 and x86-64 emulator may afford four color+depth subpixel tests per
+ * software framebuffer pixel (up to 720k scratch pixels / 5.76 MiB).
+ * Keep legacy 32-bit A1 interactive redraws on the previous fast route. */
+#if defined(__aarch64__) || defined(__x86_64__)
+#define ROUGH_SUBPIXEL_QUALITY 4u
+#else
+#define ROUGH_SUBPIXEL_QUALITY 1u
+#endif
+
 typedef struct {
     struct android_app *app;
     rough_touch_state touch;
     uint32_t *pixels;
     float *depth;
+    uint32_t *aa_pixels; /* four independently z-tested subsamples per pixel */
+    float *aa_depth;
     unsigned render_width, render_height;
     int focused;
     int dirty;
@@ -44,8 +56,12 @@ static void log_error(const char *message) {
 static void release_framebuffer(rough_android_state *state) {
     free(state->pixels);
     free(state->depth);
+    free(state->aa_pixels);
+    free(state->aa_depth);
     state->pixels = NULL;
     state->depth = NULL;
+    state->aa_pixels = NULL;
+    state->aa_depth = NULL;
     state->render_width = 0;
     state->render_height = 0;
 }
@@ -73,6 +89,8 @@ static int choose_resolution(unsigned width, unsigned height,
 static int prepare_framebuffer(rough_android_state *state,
                                unsigned width, unsigned height) {
     if (state->pixels && state->depth &&
+        (ROUGH_SUBPIXEL_QUALITY == 1u ||
+         (state->aa_pixels && state->aa_depth)) &&
         width == state->render_width && height == state->render_height) return 0;
 
     size_t count = (size_t)width * height;
@@ -81,15 +99,29 @@ static int prepare_framebuffer(rough_android_state *state,
         count > SIZE_MAX / sizeof(float)) return -1;
     uint32_t *pixels = malloc(count * sizeof *pixels);
     float *depth = malloc(count * sizeof *depth);
-    if (!pixels || !depth) {
+    uint32_t *aa_pixels = NULL;
+    float *aa_depth = NULL;
+
+    if (ROUGH_SUBPIXEL_QUALITY == 4u) {
+        /* The resolution chooser caps count at 180k, so even on a 32-bit
+         * host 4*count and both sizeof-element multiplications are bounded. */
+        aa_pixels = malloc(count * 4u * sizeof *aa_pixels);
+        aa_depth = malloc(count * 4u * sizeof *aa_depth);
+    }
+    if (!pixels || !depth ||
+        (ROUGH_SUBPIXEL_QUALITY == 4u && (!aa_pixels || !aa_depth))) {
         free(pixels);
         free(depth);
+        free(aa_pixels);
+        free(aa_depth);
         return -1;
     }
 
     release_framebuffer(state);
     state->pixels = pixels;
     state->depth = depth;
+    state->aa_pixels = aa_pixels;
+    state->aa_depth = aa_depth;
     state->render_width = width;
     state->render_height = height;
     return 0;
@@ -137,10 +169,22 @@ static void redraw(rough_android_state *state) {
     }
     rough_framebuffer target = {state->pixels, rw, rh, rw,
                                 state->depth, rw};
-    if (rough_draw_surface(&target, state->touch.shape,
-                           state->touch.yaw_degrees,
-                           state->touch.camera_distance)) {
-        log_error("Native surface generation/rasterization failed");
+    int draw_status;
+    if (ROUGH_SUBPIXEL_QUALITY == 4u) {
+        rough_framebuffer scratch = {
+            state->aa_pixels, rw * 2u, rh * 2u, rw * 2u,
+            state->aa_depth, rw * 2u
+        };
+        draw_status = rough_draw_surface_aa2(
+            &target, &scratch, state->touch.shape,
+            state->touch.yaw_degrees, state->touch.camera_distance);
+    } else {
+        draw_status = rough_draw_surface(
+            &target, state->touch.shape,
+            state->touch.yaw_degrees, state->touch.camera_distance);
+    }
+    if (draw_status) {
+        log_error("Native surface supersampling/rasterization failed");
         ANativeWindow_unlockAndPost(app->window);
         return;
     }
@@ -172,13 +216,13 @@ static void redraw(rough_android_state *state) {
     __android_log_print(ANDROID_LOG_INFO, ROUGH_TAG,
                         "FRAME input_seq=%lu render_seq=%lu shape=%s yaw=%.4f "
                         "distance=%.4f surface=%ux%u rendered=%ux%u "
-                        "painted=%u rgba_hash=%016llx",
+                        "painted=%u aa_samples=%u rgba_hash=%016llx",
                         state->input_sequence, state->render_sequence,
                         state->touch.shape == ROUGH_SURFACE_TORUS ? "torus" : "enneper",
                         state->touch.yaw_degrees,
                         state->touch.camera_distance,
                         width, height, rw, rh, painted,
-                        (unsigned long long)hash);
+                        ROUGH_SUBPIXEL_QUALITY, (unsigned long long)hash);
 }
 
 /* All app glue callbacks execute on the app's own looper thread. Touch and
