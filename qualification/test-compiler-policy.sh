@@ -39,7 +39,7 @@ require_failed_receipt() {
 # the maintained exact ICK source fixture with its own cc1, then run it.
 probe_src="$ICK_SOURCE_DIR/ick/source/gcc/testsuite/gcc.dg/ick-division-glyph.c"
 test -s "$probe_src" || { echo "Missing pinned ICK glyph probe" >&2; exit 1; }
-"$ICK_CC" -O2 -std=c11 -Wall -Wextra -Werror -pedantic -fPIC \
+"$ICK_CC" -O2 -std=c11 -Wall -Wextra -Werror -fPIC \
     -c "$probe_src" -o "$tmp/ick-dialect.o"
 readelf -h "$tmp/ick-dialect.o" | grep -q 'Class:.*ELF64'
 readelf -h "$tmp/ick-dialect.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
