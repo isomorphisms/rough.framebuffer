@@ -15,6 +15,9 @@ filled shapes, hachures, textured brushes, or stroke-width variation.
 ## Build and run
 
 ```sh
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \\
+ICK_SOURCE_DIR=/absolute/ick/checkout \\
+HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \\
 make
 fieldmouse src/rough.fm fixtures/scene.json scene.ops
 ./build/rough-fb scene.ops scene.ppm 240 200
@@ -22,8 +25,24 @@ fieldmouse src/rough.fm fixtures/scene.json scene.ops
 
 `fieldmouse` means the native Idriç-based interpreter from
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
-not Node and not a JavaScript transpiler. `make` builds only the C renderer; it
-does not secretly substitute Node if Field Mouse is unavailable.
+not Node and not a JavaScript transpiler. `make` builds only the C renderer, and its **product compiler is source-built ICK**.
+It does not silently substitute stock GCC/Clang or Node if ICK or Field Mouse is
+missing. The ICK checkout must be pinned to `c61e448251744a2f40ad743ebef1a027bdcd2f9d`
+with GCC reference submodule `6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
+The ICK driver (named `x86_64-linux-gnu-gcc` because ICK is GCC-derived) and
+its installed `cc1` are checked before **both native C source files** are compiled
+into ICK objects. `HOST_LINKER` takes only those objects and `-lm`; it does not
+compile C. Missing or mismatched ICK fails the product build, regardless of `CC`.
+
+`make test` builds the framebuffer and both 3×3/5×5 Sublixel tests from ICK
+objects, then runs the Linux fixtures. After separately building the pinned ICK,
+use the same three environment variables shown above. For explicit comparison,
+`make test-reference REFERENCE_CC=clang CC=clang` uses **reference-only** compiler
+outputs and cannot qualify or replace the ICK lane. Native `make` is x86_64 Linux
+only; target-specific Android application builds remain unqualified for ICK.
+See [the compiler-gap matrix](qualification/compiler-gaps.tsv) and
+[the policy negatives](qualification/test-compiler-policy.sh). The matrix permits
+named NDK Clang **test candidates**, not silent promotion to ICK or release claims.
 
 `make test` verifies a C raster fixture. `FIELD_MOUSE=/path/to/fieldmouse
 make test-fieldmouse` exercises the actual Field Mouse executor, including
