@@ -4,9 +4,9 @@
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 target=all
-if [ "$#" -gt 1 ]; then echo "usage: $0 [all|test|clean|policy-check]" >&2; exit 2; fi
+if [ "$#" -gt 1 ]; then echo "usage: $0 [all|test|clean|policy-check|preview]" >&2; exit 2; fi
 if [ "$#" -eq 1 ]; then target=$1; fi
-case "$target" in all|test|clean|policy-check) ;; *) echo "unsupported Ike target" >&2; exit 2 ;; esac
+case "$target" in all|test|clean|policy-check|preview) ;; *) echo "unsupported Ike target" >&2; exit 2 ;; esac
 
 : "${IKE_BIN:?IKE_BIN must identify the verified owned Ike executable}"
 : "${IKE_SOURCE_DIR:?IKE_SOURCE_DIR must name the pinned Ike source checkout}"

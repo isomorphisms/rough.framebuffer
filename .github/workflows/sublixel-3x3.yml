@@ -197,3 +197,29 @@ jobs:
           grep -Fxq $'schema\tike-build-v1' "$IKE_RECEIPT"
           grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
           cat "$IKE_RECEIPT"
+
+      - name: Render actual slanted-curvature 3x3 vs 5x5 PPM through ICK and Ike
+        shell: bash
+        env:
+          ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
+          ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
+          HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+        run: |
+          set -euo pipefail
+          export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
+          export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
+          export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
+          export IKE_RECEIPT="$RUNNER_TEMP/ike-sublixel-preview-$GITHUB_RUN_ID-$$.tsv"
+          sh scripts/run-ike.sh preview
+          test -s sublixel/build/curve-3x3-vs-5x5.ppm
+          grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
+          sha256sum sublixel/build/curve-3x3-vs-5x5.ppm
+          cat "$IKE_RECEIPT"
+
+      - name: Retain exact ICK-generated PPM for inspection
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sublixel-3x3-5x5-slanted-ppm
+          path: sublixel/build/curve-3x3-vs-5x5.ppm
+          if-no-files-found: error
+          retention-days: 14
