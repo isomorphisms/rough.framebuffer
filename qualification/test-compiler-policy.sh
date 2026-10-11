@@ -4,7 +4,12 @@
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+test_shadow=
+cleanup() {
+    rm -rf "$tmp"
+    if [ -n "$test_shadow" ]; then rm -f "$test_shadow"; fi
+}
+trap cleanup EXIT HUP INT TERM
 : "${IKE_BIN:?required pinned Ike}"
 : "${IKE_SOURCE_DIR:?required pinned Ike checkout}"
 : "${IKE_EXPECTED_SHA256:?required checked Ike digest}"
@@ -48,15 +53,18 @@ readelf -h "$tmp/ick-dialect.o" | grep -q 'Machine:.*Advanced Micro Devices X86-
 sha256sum "$ICK_CC" "$tmp/ick-dialect.o" "$tmp/ick-dialect"
 echo "Pinned ICK Unicode assignment/multiplication/division: PASS"
 
+# The enclosing Ike policy-check already owns its IKE_RECEIPT. Negative tests
+# need distinct never-used receipt names to reach the intended guard instead
+# of failing at the earlier 'receipt already exists' guard.
 # Missing or substituted orchestrator fails without compiling any project C.
-expect_block no-ike env -u IKE_BIN sh "$root/scripts/run-ike.sh" test
+expect_block no-ike env -u IKE_BIN IKE_RECEIPT="$tmp/no-ike-bin.tsv" sh "$root/scripts/run-ike.sh" test
 require_text no-ike IKE_BIN
-expect_block wrong-ike env IKE_BIN=/usr/bin/make sh "$root/scripts/run-ike.sh" test
+expect_block wrong-ike env IKE_BIN=/usr/bin/make IKE_RECEIPT="$tmp/wrong-ike.tsv" sh "$root/scripts/run-ike.sh" test
 require_text wrong-ike 'Unverified Ike executable hash'
 expect_block bad-ike-digest env IKE_EXPECTED_SHA256=0000000000000000000000000000000000000000000000000000000000000000 \
-    sh "$root/scripts/run-ike.sh" test
+    IKE_RECEIPT="$tmp/bad-digest.tsv" sh "$root/scripts/run-ike.sh" test
 require_text bad-ike-digest 'Unverified Ike executable hash'
-expect_block alt-recipe env IKE_RECIPE_RUNNER=/bin/sh sh "$root/scripts/run-ike.sh" test
+expect_block alt-recipe env IKE_RECIPE_RUNNER=/bin/sh IKE_RECEIPT="$tmp/alt-recipe.tsv" sh "$root/scripts/run-ike.sh" test
 require_text alt-recipe 'Alternate Ike recipe runner requires independent qualification'
 : > "$tmp/used-receipt.tsv"
 expect_block reused-receipt env IKE_RECEIPT="$tmp/used-receipt.tsv" \
@@ -78,6 +86,21 @@ for fake in /usr/bin/gcc /bin/true; do
     require_text "fake-$label" 'BLOCKED: compiler is not the pinned ICK installation'
     require_failed_receipt "$file"
 done
+
+# Ike v1 uses target-file mtimes. An attacker can create a future-dated
+# file called "test" so the recipe is skipped and Ike still writes final PASS.
+# The checked wrapper must reject the resulting no-recipe receipt.
+test_shadow="$root/test"
+test ! -e "$test_shadow" || {
+    echo 'Cannot run skipped-recipe negative: test target already exists' >&2
+    exit 1
+}
+touch -t 203801010000 "$test_shadow"
+expect_block skipped-recipe env IKE_RECEIPT="$tmp/skipped.tsv" \
+    sh "$root/scripts/run-ike.sh" test
+require_text skipped-recipe 'Ike recipe receipt mismatch'
+rm -f "$test_shadow"
+test_shadow=
 
 # Even if CC points at a host compiler, the product must still be compiled by
 # authenticated ICK. This is a positive real rebuild, not a string-only check.
