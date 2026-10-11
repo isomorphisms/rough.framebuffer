@@ -16,12 +16,22 @@ reference_pin=6294f1d9e7536e5ffcde09d1528c918d63abfef5
 test "$(git -C "$ICK_SOURCE_DIR" rev-parse HEAD)" = "$ick_pin"
 test "$(git -C "$ICK_SOURCE_DIR/gcc" rev-parse HEAD)" = "$reference_pin"
 test "$(sed -n 's/^gcc_commit=//p' "$ICK_SOURCE_DIR/ick/SOURCE.lock")" = "$reference_pin"
-test "$("$ICK_CC" -dumpmachine)" = x86_64-linux-gnu
-stage_dir=$(dirname "$(dirname "$ICK_CC")")
+# The source pin alone does not authenticate an arbitrary binary that a
+# caller names ICK_CC. This qualification installs from the pinned checkout
+# into its stage/bin; refuse stock gcc, wrappers, or unrelated installations.
+required_driver="$ICK_SOURCE_DIR/stage/bin/x86_64-linux-gnu-gcc"
+if [ "$ICK_CC" != "$required_driver" ]; then
+    echo "BLOCKED: compiler is not the pinned ICK installation: $ICK_CC" >&2
+    exit 3
+fi
+test "$("$ICK_CC" -dumpmachine)" = x86_64-linux-gnu || {
+    echo "BLOCKED: ICK target is not x86_64-linux-gnu" >&2; exit 3;
+}
 cc1=$("$ICK_CC" -print-prog-name=cc1)
 case "$cc1" in
-  "$stage_dir"/*) test -x "$cc1" ;;
-  *) echo "C frontend escaped the pinned ICK installation: $cc1" >&2; exit 3 ;;
+  "$ICK_SOURCE_DIR"/stage/libexec/gcc/x86_64-linux-gnu/*/cc1)
+      test -x "$cc1" ;;
+  *) echo "BLOCKED: cc1 is outside pinned ICK stage: $cc1" >&2; exit 3 ;;
 esac
 
 out="$repo_root/sublixel/build/ick"

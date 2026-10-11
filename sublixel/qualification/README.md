@@ -14,8 +14,7 @@ All seven consumer C sources compile exclusively through **source-built ICK**,
 `dilapidated-shed/ick@c61e448251744a2f40ad743ebef1a027bdcd2f9d`,
 with GCC reference submodule
 `6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
-The ICK C11 compile script binds exact ICK source, actual installed cc1
-binary, target triple, output ELF ABI and object/executable checksums.
+The ICK C11 compile script binds exact ICK source and **requires the driver at that checkout's staged installation path**, with `cc1` inside its staged libexec tree. Stock `/usr/bin/gcc` and success-only impostors must fail even if passed as `ICK_CC`; target triple, ELF ABI and object/executable checksums are recorded.
 
 - `sublixel/src/curve_patch.c` and `sublixel/tests/test_curve_patch.c` (quadratic 3×3)
 - `sublixel/src/curve_patch_5x5.c` and `sublixel/tests/test_curve_patch_5x5.c` (cubic 5×5)
