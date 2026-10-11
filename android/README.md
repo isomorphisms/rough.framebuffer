@@ -27,12 +27,27 @@ depth together about 5.76 MiB), plus about 1.44 MiB for the base buffers.
 It is reused across touch redraws. The older Android ARM32 A1 build preserves
 the one-sample renderer for responsiveness and memory.
 
-It is not full-resolution multisampling of every 720×1600 display pixel.
-Edges under extreme zoom may still expose the software resolution. More
-importantly, this does **not** yet interpolate analytic normals or lighting
-across triangles: colored polygon facets remain part of
-[the open visual-quality issue #5](https://github.com/isomorphisms/rough.framebuffer/issues/5).
-A physical C67 speed and quality comparison of this updated APK is still needed.
+## Smooth analytic normal shading
+
+The C67 AArch64 and x86-64 emulator AA2 path now interpolates **analytic
+unit normals** for the torus and Enneper minimal surface. A new fragment
+shader applies two-sided diffuse+ambient lighting after perspective-correct
+normal and material interpolation. Position, normal, and color are clipped
+together against the near plane before projection. This removes abrupt
+**face-normal lighting changes** while keeping the same four z-tested
+subpixel samples and their top-left shared-edge rule.
+
+The old flat-shaded `rough_draw_surface` and historical `P/T` streams
+are unchanged; the 32-bit MIRO A1 consumer retains its faster original
+path. Per-fragment lighting costs more CPU than the flat-shaded renderer.
+A passing emulator screenshot is not a C67 frame-time measurement.
+
+This is not full-resolution multisampling of every 720×1600 physical
+display pixel; zoom may still reveal the underlying triangle tessellation
+or software-resolution limits. The remaining perceptual quality and
+performance questions are recorded in
+[issue #5](https://github.com/isomorphisms/rough.framebuffer/issues/5). A
+physical C67 visual/speed comparison of this updated APK is still needed.
 
 ## Native lifecycle and pixels
 

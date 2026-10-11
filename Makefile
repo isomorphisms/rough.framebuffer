@@ -37,13 +37,18 @@ build/test-surface-aa: tests/test_surface_aa.c src/surface_aa.c src/surface_aa.h
 	@mkdir -p build
 	$(CC) $(CFLAGS) -Isrc tests/test_surface_aa.c src/surface_aa.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present build/test-rotation-grab build/test-surface-aa
+build/test-smooth: tests/test_smooth.c src/surface.c src/surface.h src/framebuffer.c src/framebuffer.h
+	@mkdir -p build
+	$(CC) $(CFLAGS) -Isrc tests/test_smooth.c src/surface.c src/framebuffer.c -o $@ $(LDLIBS)
+
+test: build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present build/test-rotation-grab build/test-surface-aa build/test-smooth
 	./build/test-api
 	./build/test-surface
 	./build/test-touch
 	./build/test-rotation-grab
 	./build/test-present
 	./build/test-surface-aa
+	./build/test-smooth
 	python3 tests/test_raster.py build/rough-fb
 
 test-fieldmouse: build/rough-fb
