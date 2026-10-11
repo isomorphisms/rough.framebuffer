@@ -3,6 +3,8 @@
 # HOST_LINKER receives object files only; it never compiles product C.
 set -eu
 root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
+# A failed mandatory ICK build must never leave a previous product executable.
+rm -f "$root/build/rough-fb"
 
 : "${ICK_CC:?BLOCKED: ICK_CC must name the pinned source-built ICK compiler}"
 : "${ICK_SOURCE_DIR:?BLOCKED: ICK_SOURCE_DIR must name the pinned ICK checkout}"
