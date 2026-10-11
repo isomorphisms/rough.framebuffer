@@ -164,8 +164,8 @@ static void test_normal_is_evaluated_per_fragment(void) {
     }
     rough_framebuffer fb={pixels,16,16,16,depth,16};
     rough_smooth_vertex a=vertex(1,1,.5,1,0,0,-1,200,200,200);
-    rough_smooth_vertex b=vertex(14,1,.5,1,0,-1,0,200,200,200);
-    rough_smooth_vertex c=vertex(1,14,.5,1,-1,0,0,200,200,200);
+    rough_smooth_vertex b=vertex(14,1,.5,1,0,1,0,200,200,200);
+    rough_smooth_vertex c=vertex(1,14,.5,1,1,0,0,200,200,200);
     assert(rough_fill_smooth_triangle(&fb,a,b,c) == 0);
     unsigned center=(pixels[2u*16u+2u]>>16)&255u;
     unsigned toward_y=(pixels[2u*16u+10u]>>16)&255u;
