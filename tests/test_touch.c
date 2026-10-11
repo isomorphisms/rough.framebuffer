@@ -57,7 +57,9 @@ int main(void) {
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 7, 25, 40) == 0);
     assert(touch.yaw_degrees == 0.0); /* deadzone prevents accidental rotation */
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 7, 60, 40) == 1);
-    assert(fabs(touch.yaw_degrees - 45.0) < 1e-12);
+    /* Camera +z points inward: right drag must grab the near half.
+     * The old +45 assertion encoded the exact inverted-hand bug. */
+    assert(fabs(touch.yaw_degrees - 315.0) < 1e-12);
     uint64_t rotated = render_frame(&touch, &painted);
     assert(rotated != initial && painted > 100u);
 
