@@ -36,7 +36,7 @@ esac
 
 output_dir="$repo_root/sublixel/build/ick"
 mkdir -p "$output_dir"
-flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math"
+flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math -fPIC"
 # Deliberate ordinary C dialect: ICKY's replacement parser is not yet adopted.
 # Separate -c invocations must not silently invoke host GCC or Clang as a C compiler.
 "$ICK_CC" $flags -I"$repo_root/sublixel/include" -c   "$repo_root/sublixel/src/curve_patch.c" -o "$output_dir/curve_patch.o"
