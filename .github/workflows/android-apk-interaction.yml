@@ -139,16 +139,21 @@ jobs:
             adb shell input tap 550 700
             sleep 4
             adb exec-out screencap -p > build/android/emulator/after-tap.png
+            adb shell input swipe 550 700 550 1800 650
+            sleep 4
+            adb exec-out screencap -p > build/android/emulator/after-zoom.png
             adb shell am force-stop org.isomorphisms.roughframebuffer
             adb shell am start -W -n org.isomorphisms.roughframebuffer/android.app.NativeActivity
             sleep 4
             adb exec-out screencap -p > build/android/emulator/after-restart.png
             adb logcat -d -s RoughFrameArt:I > build/android/emulator/native-frame-log.txt
             grep -E 'FRAME input_seq=.*painted=[1-9][0-9]*' build/android/emulator/native-frame-log.txt
-            for image in before after-drag after-tap after-restart; do ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' -frames:v 1 -pix_fmt rgb24 -f rawvideo "build/android/emulator/$image.rgb"; done
+            grep -Eq 'FRAME input_seq=.*shape=enneper.*distance=6\.[0-9]+' build/android/emulator/native-frame-log.txt
+            for image in before after-drag after-tap after-zoom after-restart; do ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' -frames:v 1 -pix_fmt rgb24 -f rawvideo "build/android/emulator/$image.rgb"; done
             build/android/aici-screen-witness build/android/emulator/before.rgb build/android/emulator/after-drag.rgb
             build/android/aici-screen-witness build/android/emulator/after-drag.rgb build/android/emulator/after-tap.rgb
-            build/android/aici-screen-witness build/android/emulator/after-tap.rgb build/android/emulator/after-restart.rgb
+            build/android/aici-screen-witness build/android/emulator/after-tap.rgb build/android/emulator/after-zoom.rgb
+            build/android/aici-screen-witness build/android/emulator/after-zoom.rgb build/android/emulator/after-restart.rgb
             sha256sum build/android/emulator/*.png
       - name: Retain candidate-only signed APK and real emulator frames if accepted
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
