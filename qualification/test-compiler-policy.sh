@@ -18,10 +18,12 @@ trap cleanup EXIT HUP INT TERM
 : "${HOST_LINKER:?required object-only linker}"
 
 expect_block() {
-    label=$1
+    # POSIX shell function assignments are shared with the caller. Keep this
+    # helper's name distinct from the counterfeit-compiler loop's label.
+    refusal_case_label=$1
     shift
-    if "$@" > "$tmp/$label.log" 2>&1; then
-        echo "FAIL: prohibited build was accepted: $label" >&2
+    if "$@" > "$tmp/$refusal_case_label.log" 2>&1; then
+        echo "FAIL: prohibited build was accepted: $refusal_case_label" >&2
         exit 1
     fi
 }
