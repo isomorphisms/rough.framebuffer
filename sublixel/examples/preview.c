@@ -4,6 +4,8 @@
  * is sample-mask OR, never additive alpha. No Android/GPU or external renderer.
  */
 #include "sublixel/curve_patch.h"
+#include "sublixel/coverage_plane.h"
+#include "sublixel_framebuffer.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -12,8 +14,16 @@
 #include <string.h>
 
 enum { WIDTH = 96, HEIGHT = 72, FRAME_WIDTH = 2 * WIDTH, PATCH_COUNT = 385 };
-static uint64_t quadratic_occupancy[HEIGHT][WIDTH];
-static uint64_t cubic_occupancy[HEIGHT][WIDTH];
+static uint64_t quadratic_occupancy[WIDTH * HEIGHT];
+static uint64_t cubic_occupancy[WIDTH * HEIGHT];
+static uint32_t quadratic_pixels[WIDTH * HEIGHT];
+static uint32_t cubic_pixels[WIDTH * HEIGHT];
+static cp_coverage_plane quadratic_plane = {
+    quadratic_occupancy, WIDTH * HEIGHT, WIDTH, WIDTH, HEIGHT, 0, 0
+};
+static cp_coverage_plane cubic_plane = {
+    cubic_occupancy, WIDTH * HEIGHT, WIDTH, WIDTH, HEIGHT, 0, 0
+};
 
 static unsigned popcount64(uint64_t value) {
     unsigned count = 0;
@@ -24,27 +34,7 @@ static unsigned popcount64(uint64_t value) {
     return count;
 }
 
-static void merge3(const cp_accumulator_3x3 *accumulator) {
-    for (int iy = 0; iy != 3; ++iy)
-        for (int ix = 0; ix != 3; ++ix) {
-            int x = accumulator->center_x + ix - 1;
-            int y = accumulator->center_y + iy - 1;
-            if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT)
-                quadratic_occupancy[y][x] |= accumulator->occupied[iy][ix];
-        }
-}
-
-static void merge5(const cp_accumulator_5x5 *accumulator) {
-    for (int iy = 0; iy != 5; ++iy)
-        for (int ix = 0; ix != 5; ++ix) {
-            int x = accumulator->center_x + ix - 2;
-            int y = accumulator->center_y + iy - 2;
-            if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT)
-                cubic_occupancy[y][x] |= accumulator->occupied[iy][ix];
-        }
-}
-
-/* Caller-owned fixed-size working memory: ~108 KiB for both coverage planes.
+/* Caller-owned fixed-size working memory: ~162 KiB for coverage and actual color planes.
  * One fixed set of Bezier controls feeds both models, so this is genuinely a
  * model comparison, not two arbitrary hardcoded pictures.
  */
@@ -63,29 +53,22 @@ static int accumulate_stroke(void) {
         int y = (int)lround(quadratic.origin.y);
         if (x < -3 || x >= WIDTH + 3 || y < -3 || y >= HEIGHT + 3)
             return 0;
-        cp_accumulator_3x3 grid3;
-        cp_accumulator_5x5 grid5;
-        cp_patch_accumulator_3x3_init(&grid3, x, y);
-        cp_patch_accumulator_5x5_init(&grid5, x, y);
-        if (cp_patch_accumulate_3x3(&grid3, &quadratic) != CP_OK ||
-            cp_patch_accumulate_5x5(&grid5, &cubic) != CP_OK)
+        if (cp_coverage_plane_accumulate_3x3(&quadratic_plane,
+                &quadratic, x, y) != CP_OK ||
+            cp_coverage_plane_accumulate_5x5(&cubic_plane,
+                &cubic, x, y) != CP_OK)
             return 0;
-
-        merge3(&grid3);
-        merge5(&grid5);
     }
     return 1;
 }
 
-/* C11 rejects implicit qualification of pointers to arrays of const elements;
- * these internal readers never write the caller-owned mutable coverage planes. */
-static uint64_t checksum_plane(uint64_t plane[HEIGHT][WIDTH]) {
+static uint64_t checksum_plane(const uint64_t *plane) {
     /* FNV-1a over individual occupied bits, serialized in little-endian
      * order independent of the native machine's byte representation. */
     uint64_t hash = UINT64_C(14695981039346656037);
     for (int y = 0; y < HEIGHT; ++y)
         for (int x = 0; x < WIDTH; ++x) {
-            uint64_t bits = plane[y][x];
+            uint64_t bits = plane[(size_t)y * WIDTH + x];
             for (int byte = 0; byte < 8; ++byte) {
                 hash ^= (unsigned char)(bits >> (byte * 8));
                 hash *= UINT64_C(1099511628211);
@@ -94,7 +77,7 @@ static uint64_t checksum_plane(uint64_t plane[HEIGHT][WIDTH]) {
     return hash;
 }
 
-static int inspect_slant(uint64_t plane[HEIGHT][WIDTH], const char *name) {
+static int inspect_slant(const uint64_t *plane, const char *name) {
     unsigned populated = 0;
     int first_x = WIDTH, last_x = -1;
     int first_y = HEIGHT, last_y = -1;
@@ -102,7 +85,7 @@ static int inspect_slant(uint64_t plane[HEIGHT][WIDTH], const char *name) {
 
     for (int y = 0; y < HEIGHT; ++y)
         for (int x = 0; x < WIDTH; ++x) {
-            unsigned count = popcount64(plane[y][x]);
+            unsigned count = popcount64(plane[(size_t)y * WIDTH + x]);
             if (count == 0) continue;
             ++populated;
             if (count < 64) ++partially_covered;
@@ -125,9 +108,23 @@ static int inspect_slant(uint64_t plane[HEIGHT][WIDTH], const char *name) {
     return 1;
 }
 
-static unsigned char gray(uint64_t bits) {
-    unsigned occupied = popcount64(bits);
-    return (unsigned char)(255u - (occupied * 255u + 32u) / 64u);
+static int compose_framebuffers(void) {
+    for (size_t index = 0; index < WIDTH * HEIGHT; ++index) {
+        quadratic_pixels[index] = UINT32_C(0xffffffff);
+        cubic_pixels[index] = UINT32_C(0xffffffff);
+    }
+    rough_framebuffer quadratic_target = {
+        .pixels = quadratic_pixels, .width = WIDTH, .height = HEIGHT,
+        .stride_pixels = WIDTH
+    };
+    rough_framebuffer cubic_target = {
+        .pixels = cubic_pixels, .width = WIDTH, .height = HEIGHT,
+        .stride_pixels = WIDTH
+    };
+    return rough_blend_sublixel_coverage(&quadratic_target, &quadratic_plane,
+               UINT32_C(0xff000000), 1.0) == 0 &&
+           rough_blend_sublixel_coverage(&cubic_target, &cubic_plane,
+               UINT32_C(0xff000000), 1.0) == 0;
 }
 
 static int emit_ppm(FILE *output) {
@@ -135,11 +132,13 @@ static int emit_ppm(FILE *output) {
         return 0;
     for (int y = 0; y < HEIGHT; ++y)
         for (int x = 0; x < FRAME_WIDTH; ++x) {
-            uint64_t bits = x < WIDTH
-                ? quadratic_occupancy[y][x]
-                : cubic_occupancy[y][x - WIDTH];
-            unsigned char value = gray(bits);
-            unsigned char rgb[3] = {value, value, value};
+            uint32_t pixel = x < WIDTH
+                ? quadratic_pixels[(size_t)y * WIDTH + x]
+                : cubic_pixels[(size_t)y * WIDTH + x - WIDTH];
+            unsigned char rgb[3] = {
+                (unsigned char)(pixel >> 16), (unsigned char)(pixel >> 8),
+                (unsigned char)pixel
+            };
             if (fwrite(rgb, 1, sizeof rgb, output) != sizeof rgb)
                 return 0;
         }
@@ -163,6 +162,8 @@ static int self_test(void) {
         fputs("Sublixel duplicate-patch opacity regression\n", stderr);
         return 0;
     }
+
+    if (!compose_framebuffers()) return 0;
 
     FILE *test = tmpfile();
     if (!test) return 0;

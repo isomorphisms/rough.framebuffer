@@ -19,11 +19,12 @@ mkdir -p "$out"
 flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -fPIC -ffp-contract=off -fno-fast-math"
 
 # Never pass project .c source to the object-only system linker.
-"$ICK_CC" $flags -I"$root/sublixel/include" \
+"$ICK_CC" $flags -I"$root/sublixel/include" -I"$root/src" \
     -c "$root/sublixel/examples/preview.c" -o "$out/sublixel-preview.o"
 readelf -h "$out/sublixel-preview.o" | grep -q 'Class:.*ELF64'
 readelf -h "$out/sublixel-preview.o" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
 "$HOST_LINKER" "$out/curve_patch.o" "$out/curve_patch_5x5.o" \
+    "$out/coverage_plane.o" "$out/sublixel_framebuffer.o" \
     "$out/sublixel-preview.o" -lm -o "$out/sublixel-preview"
 "$out/sublixel-preview" --self-test
 "$out/sublixel-preview" "$root/sublixel/build/curve-3x3-vs-5x5.ppm"
