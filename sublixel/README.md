@@ -1,5 +1,34 @@
 # Sublixel: local 3×3 and 5×5 curvature neighborhoods
 
+## Reusable occupancy plane and framebuffer boundary
+
+`sublixel/coverage_plane.h` exposes bounded caller-owned occupancy storage.
+The 3×3/5×5 integration functions evaluate the actual neighborhood, clip its
+global coordinates against the destination plane, and OR individual sample
+masks. Failed layout or patch checks leave occupancy unchanged. Row padding,
+negative origins and capacity arithmetic are checked. Callers clear storage
+explicitly and keep different colored shapes in separate planes.
+
+`src/sublixel_framebuffer.h` is the separate rendering boundary. It resolves
+coverage once and source-over blends into the actual `rough_framebuffer`,
+using the documented straight-alpha byte-channel convention. Color alpha,
+opacity and sample coverage are independent factors. It owns no allocation,
+does not mutate occupancy, and does not read or write depth. Buffers must not
+overlap. It does not promise gamma conversion or depth-aware strokes.
+
+The native preview now uses both boundaries instead of owning private
+neighborhood-merging and grayscale-rendering implementations. This is a real
+framebuffer consumer, while the legacy P/M/L/C kernel is still separate.
+It does not silently change stroke caps, taper semantics or transparency
+grouping. Curve sampling plans remain explicit: a local patch is not a
+complete global stroke, and sample-mask idempotence is not a proof of exact
+curve-subdivision invariance.
+
+The new code uses the established C11 library boundary and compiles through
+ICK under the existing pinned Ike recipes. The POSIX entrypoints are retained
+because their literal commands and `posix-system` runner are part of the
+already qualified receipt interface; no new shell helper is introduced.
+
 An independent C11 curve-neighborhood library underneath the
 `rough.framebuffer` workspace. It computes local curve geometry and
 fractional grayscale pixel coverage with no framebuffer, Android, Field Mouse,
