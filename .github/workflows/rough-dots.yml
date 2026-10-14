@@ -1,0 +1,20 @@
+name: Rough dot-stroke host smoke
+on:
+  push:
+    branches: [renderer/continuous-dots]
+  pull_request:
+    paths:
+      - 'src/framebuffer.c'
+      - 'src/framebuffer.h'
+      - 'tests/test_raster.py'
+      - 'fixtures/**'
+      - '.github/workflows/rough-dots.yml'
+jobs:
+  native-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run raster smoke
+        run: make clean test
+      - name: Strict Clang smoke
+        run: make clean test CC=clang
