@@ -82,6 +82,34 @@ with TemporaryDirectory() as directory:
     assert pixel(pixels, 20, 12, 5) != b"\xff\xff\xff"
     assert pixel(pixels, 20, 8, 5) != b"\xff\xff\xff"
 
+    # Dotted paths preserve phase through an exact corner/joint, including
+    # when neighboring segments have different directions.
+    operations.write_text(
+        "P 0 0 0\nA 0.5\nW 1\nD 2 6\nM 2 2\nL 16 2\nL 16 18\n"
+        "M 2 25\nL 18 25\n"
+    )
+    run([exe, str(operations), str(output), "30", "30"], check=True)
+    pixels = pixels_from(output, 30, 30)
+    assert pixel(pixels, 30, 3, 2) == bytes((128, 128, 128))
+    assert pixel(pixels, 30, 7, 2) == b"\xff\xff\xff"
+    assert pixel(pixels, 30, 11, 2) == bytes((128, 128, 128))
+    assert pixel(pixels, 30, 16, 3) == b"\xff\xff\xff"
+    assert pixel(pixels, 30, 16, 5) == bytes((128, 128, 128))
+    assert pixel(pixels, 30, 3, 25) == bytes((128, 128, 128))
+
+    # Pattern distances include clipped-off travel (viewport never resets it).
+    operations.write_text("P 0 0 0\nD 2 6\nM -100 4\nL 6 4\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True, timeout=5)
+    pixels = pixels_from(output, 30, 30)
+    assert pixel(pixels, 30, 0, 4) == b"\xff\xff\xff"
+    assert pixel(pixels, 30, 4, 4) == b"\x00\x00\x00"
+
+    # D 0 0 restores solid strokes; alpha remains independent of dash state.
+    operations.write_text("P 0 0 0\nD 2 6\nD 0 0\nM 2 9\nL 18 9\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True)
+    pixels = pixels_from(output, 30, 30)
+    assert pixel(pixels, 30, 7, 9) == b"\x00\x00\x00"
+
     # Long, extra, or out-of-range fields cannot enter the native parser.
     malformed = [
         "M 0 0 junk\n",
@@ -92,6 +120,13 @@ with TemporaryDirectory() as directory:
         "A 1.1\n",
         "M 0 0\nL 1 1 2 3\n",
         "M 0 0\nC 1 1 2 2 3 3 4 5\n",
+        "D 1\n",
+        "D 1 0\n",
+        "D 0 1\n",
+        "D -1 4\n",
+        "D 0.001 8\n",
+        "D 1 4 5\n",
+
     ]
     for text in malformed:
         operations.write_text(text)
