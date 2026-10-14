@@ -1,20 +1,38 @@
-name: Rough dot-stroke host smoke
+name: Rough dotted strokes through owned ICK
 on:
   push:
     branches: [renderer/continuous-dots]
   pull_request:
-    paths:
-      - 'src/framebuffer.c'
-      - 'src/framebuffer.h'
-      - 'tests/test_raster.py'
-      - 'fixtures/**'
-      - '.github/workflows/rough-dots.yml'
+permissions:
+  contents: read
 jobs:
-  native-coverage:
-    runs-on: ubuntu-latest
+  ick-native-coverage:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - name: Build and run raster smoke
+      - name: Checkout exact candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Build and qualify source-pinned ICK host compiler
+        id: ick
+        uses: isomorphisms/ai-ci/ick-host@4ea071a96239f3a29ca6d98454feb59947d87cfe
+      - name: Compile and execute real dotted/alpha tests with ICK
+        env:
+          ICK_CC: ${{ steps.ick.outputs.compiler }}
+          ICK_SOURCE_DIR: ${{ github.workspace }}/.ick-host-source
         run: make clean test
-      - name: Strict Clang smoke
-        run: make clean test CC=clang
+      - name: Reject absent ICK and fake compiler
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          make clean
+          if make test > "$RUNNER_TEMP/no-ick.log" 2>&1; then
+            echo "Unpinned compiler unexpectedly accepted" >&2; exit 1
+          fi
+          grep -q 'BLOCKED: pinned ICK_CC' "$RUNNER_TEMP/no-ick.log"
+          if make test ICK_CC=/usr/bin/cc ICK_SOURCE_DIR="$GITHUB_WORKSPACE/.ick-host-source" > "$RUNNER_TEMP/stock-compiler.log" 2>&1; then
+            echo "Stock compiler unexpectedly accepted" >&2; exit 1
+          fi
+          grep -q 'BLOCKED: refuse stock' "$RUNNER_TEMP/stock-compiler.log"
