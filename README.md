@@ -70,6 +70,19 @@ Pixel centers use integer coordinates. A width-one horizontal stroke at `y = 2`
 therefore fully covers row 2, preserving the original stream-to-pixel convention;
 non-axis-aligned edges receive fractional coverage.
 
+## ICK-only compilation for the dotted framebuffer candidate
+
+The user requires **ICK exclusively** for the Billiard consumer. On this branch
+the product Makefile no longer accepts default stock C compilation: it must
+receive an identified, source-built ICK compiler and the matching exact source
+checkout. The pinned GitHub workflow uses the owned `ick-host` action and
+rejects both missing and stock C compilers. ICK's executable name ends in
+`gcc` only because its compiler implementation is GCC-derived; verify the
+commit and owning `cc1`, not its filename.
+
+Any old GCC/Clang-created dot-stroke images remain historical and do not
+establish ICK-only acceptance. This branch supplies the required exact-head
+ICK output to `isomorphisms/billiard`.
 ## Translucent dotted strokes (stacked on coverage-strokes)
 
 The `renderer/continuous-dots` candidate extends the reviewed `P/A/W/M/L/C`
