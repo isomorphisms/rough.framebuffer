@@ -70,6 +70,34 @@ Pixel centers use integer coordinates. A width-one horizontal stroke at `y = 2`
 therefore fully covers row 2, preserving the original stream-to-pixel convention;
 non-axis-aligned edges receive fractional coverage.
 
+## Translucent dotted strokes (stacked on coverage-strokes)
+
+The `renderer/continuous-dots` candidate extends the reviewed `P/A/W/M/L/C`
+geometry stream with `D ON OFF` in framebuffer pixel units:
+
+```text
+P 48 130 165
+A 0.20
+W 1.1
+D 1 6
+M 10 20
+L 85 20
+L 85 105
+D 0 0
+```
+
+`D` repeats ON units painted, then OFF units unpainted. Each nonzero interval
+must be at least 0.25 and at most 1,000,000. `D 0 0` switches back to a solid
+stroke; any other zero/negative interval is rejected. Pattern phase is based on
+**the entire mathematical segment length**, including portions outside the
+viewport. Successive `L` segments and flattened `C` chords carry phase
+continuously across joints; `M` and `D` reset phase to zero.
+
+The painter's stroke may be rough, but mathematical collision geometry belongs
+to the consumer. Alpha and width remain independent of the dash pattern.
+This branch is stacked on PR #1, whose alpha and antialias work remains
+unmerged; neither branch alone establishes Android-device acceptance.
+
 ## Pipeline
 
 ```text
