@@ -1,37 +1,37 @@
-name: Sublixel ICK compiler + Ike orchestrated C11 qualification
+name: Subpixel ICK compiler + Ike orchestrated C11 qualification
 on:
   pull_request:
     paths:
-      - 'sublixel/**'
+      - 'subpixel/**'
       - 'Makefile'
       - 'Ikefile'
       - 'scripts/run-ike.sh'
       - 'qualification/**'
-      - 'sublixel/Makefile'
+      - 'subpixel/Makefile'
       - 'src/framebuffer.c'
       - 'src/framebuffer.h'
-      - 'src/sublixel_framebuffer.c'
-      - 'src/sublixel_framebuffer.h'
+      - 'src/subpixel_framebuffer.c'
+      - 'src/subpixel_framebuffer.h'
       - 'src/main.c'
       - 'tests/test_raster_ick.c'
-      - '.github/workflows/sublixel-3x3.yml'
+      - '.github/workflows/subpixel-3x3.yml'
   push:
     branches:
-      - 'sublixel/**'
+      - 'subpixel/**'
     paths:
-      - 'sublixel/**'
+      - 'subpixel/**'
       - 'Makefile'
       - 'Ikefile'
       - 'scripts/run-ike.sh'
       - 'qualification/**'
-      - 'sublixel/Makefile'
+      - 'subpixel/Makefile'
       - 'src/framebuffer.c'
       - 'src/framebuffer.h'
-      - 'src/sublixel_framebuffer.c'
-      - 'src/sublixel_framebuffer.h'
+      - 'src/subpixel_framebuffer.c'
+      - 'src/subpixel_framebuffer.h'
       - 'src/main.c'
       - 'tests/test_raster_ick.c'
-      - '.github/workflows/sublixel-3x3.yml'
+      - '.github/workflows/subpixel-3x3.yml'
 
 permissions:
   contents: read
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
-      - name: Check out exact Sublixel candidate
+      - name: Check out exact Subpixel candidate
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -146,7 +146,7 @@ jobs:
           export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
           export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
           export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
-          export IKE_RECEIPT="$RUNNER_TEMP/ike-sublixel-$GITHUB_RUN_ID-$$.tsv"
+          export IKE_RECEIPT="$RUNNER_TEMP/ike-subpixel-$GITHUB_RUN_ID-$$.tsv"
           sh scripts/run-ike.sh test
           grep -Fxq $'schema\tike-build-v1' "$IKE_RECEIPT"
           grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
@@ -177,7 +177,7 @@ jobs:
         run: |
           set -euo pipefail
           for fake in /usr/bin/gcc /bin/true; do
-            if ICK_CC="$fake" sh sublixel/qualification/test-ick.sh > /tmp/fake-ick.log 2>&1; then
+            if ICK_CC="$fake" sh subpixel/qualification/test-ick.sh > /tmp/fake-ick.log 2>&1; then
               echo "Accepted counterfeit compiler: $fake" >&2
               exit 1
             fi
@@ -213,17 +213,17 @@ jobs:
           export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
           export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
           export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
-          export IKE_RECEIPT="$RUNNER_TEMP/ike-sublixel-preview-$GITHUB_RUN_ID-$$.tsv"
+          export IKE_RECEIPT="$RUNNER_TEMP/ike-subpixel-preview-$GITHUB_RUN_ID-$$.tsv"
           sh scripts/run-ike.sh preview
-          test -s sublixel/build/curve-3x3-vs-5x5.ppm
+          test -s subpixel/build/curve-3x3-vs-5x5.ppm
           grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
-          sha256sum sublixel/build/curve-3x3-vs-5x5.ppm
+          sha256sum subpixel/build/curve-3x3-vs-5x5.ppm
           cat "$IKE_RECEIPT"
 
       - name: Retain exact ICK-generated PPM for inspection
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: sublixel-3x3-5x5-slanted-ppm
-          path: sublixel/build/curve-3x3-vs-5x5.ppm
+          name: subpixel-3x3-5x5-slanted-ppm
+          path: subpixel/build/curve-3x3-vs-5x5.ppm
           if-no-files-found: error
           retention-days: 14

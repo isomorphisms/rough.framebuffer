@@ -1,11 +1,11 @@
-/* A genuine native consumer of Sublixel 3x3 and 5x5 coverage.
+/* A genuine native consumer of Subpixel 3x3 and 5x5 coverage.
  * Produces a side-by-side PPM of one slanted cubic Bezier stroke.
  * Geometry comes from the corresponding public curve patch APIs; coverage
  * is sample-mask OR, never additive alpha. No Android/GPU or external renderer.
  */
-#include "sublixel/curve_patch.h"
-#include "sublixel/coverage_plane.h"
-#include "sublixel_framebuffer.h"
+#include "subpixel/curve_patch.h"
+#include "subpixel/coverage_plane.h"
+#include "subpixel_framebuffer.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -97,7 +97,7 @@ static int inspect_slant(const uint64_t *plane, const char *name) {
     if (populated < 40 || populated > 1500 ||
         partially_covered < 20 || last_x - first_x < 65 ||
         last_y - first_y < 26) {
-        fprintf(stderr, "Sublixel visual geometry invalid (%s): pixels=%u fractional=%u x=[%d,%d] y=[%d,%d]\n",
+        fprintf(stderr, "Subpixel visual geometry invalid (%s): pixels=%u fractional=%u x=[%d,%d] y=[%d,%d]\n",
                 name, populated, partially_covered,
                 first_x, last_x, first_y, last_y);
         return 0;
@@ -121,9 +121,9 @@ static int compose_framebuffers(void) {
         .pixels = cubic_pixels, .width = WIDTH, .height = HEIGHT,
         .stride_pixels = WIDTH
     };
-    return rough_blend_sublixel_coverage(&quadratic_target, &quadratic_plane,
+    return rough_blend_subpixel_coverage(&quadratic_target, &quadratic_plane,
                UINT32_C(0xff000000), 1.0) == 0 &&
-           rough_blend_sublixel_coverage(&cubic_target, &cubic_plane,
+           rough_blend_subpixel_coverage(&cubic_target, &cubic_plane,
                UINT32_C(0xff000000), 1.0) == 0;
 }
 
@@ -159,7 +159,7 @@ static int self_test(void) {
     if (!accumulate_stroke()) return 0;
     if (first3 != checksum_plane(quadratic_occupancy) ||
         first5 != checksum_plane(cubic_occupancy)) {
-        fputs("Sublixel duplicate-patch opacity regression\n", stderr);
+        fputs("Subpixel duplicate-patch opacity regression\n", stderr);
         return 0;
     }
 
@@ -174,7 +174,7 @@ static int self_test(void) {
     long bytes = ftell(test);
     if (bytes != (long)(sizeof("P6\n192 72\n255\n") - 1 +
                       FRAME_WIDTH * HEIGHT * 3)) {
-        fprintf(stderr, "Sublixel PPM size mismatch: %ld\n", bytes);
+        fprintf(stderr, "Subpixel PPM size mismatch: %ld\n", bytes);
         fclose(test);
         return 0;
     }
@@ -187,13 +187,13 @@ static int self_test(void) {
 
     printf("native frame hashes: 3x3=%016llx 5x5=%016llx\n",
            (unsigned long long)first3, (unsigned long long)first5);
-    puts("Sublixel real 3x3/5x5 slanted-curve preview: PASS");
+    puts("Subpixel real 3x3/5x5 slanted-curve preview: PASS");
     return 1;
 }
 
 int main(int argc, char **argv) {
     if (argc > 2) {
-        fputs("usage: sublixel-preview [output.ppm | --self-test]\n", stderr);
+        fputs("usage: subpixel-preview [output.ppm | --self-test]\n", stderr);
         return 2;
     }
     if (!self_test()) return 1;
@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
     int success = emit_ppm(output);
     if (fclose(output) != 0) success = 0;
     if (!success) {
-        fputs("Sublixel preview PPM write failed\n", stderr);
+        fputs("Subpixel preview PPM write failed\n", stderr);
         return 1;
     }
     return 0;

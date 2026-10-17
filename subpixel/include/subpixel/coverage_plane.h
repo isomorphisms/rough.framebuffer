@@ -1,7 +1,7 @@
-#ifndef SUBLIXEL_COVERAGE_PLANE_H
-#define SUBLIXEL_COVERAGE_PLANE_H
+#ifndef SUBPIXEL_COVERAGE_PLANE_H
+#define SUBPIXEL_COVERAGE_PLANE_H
 
-#include "sublixel/curve_patch.h"
+#include "subpixel/curve_patch.h"
 #include <stddef.h>
 
 /* Caller-owned global occupancy. Each word uses exactly the same 8x8 sample

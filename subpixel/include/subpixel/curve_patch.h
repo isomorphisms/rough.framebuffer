@@ -1,5 +1,5 @@
-#ifndef SUBLIXEL_CURVE_PATCH_H
-#define SUBLIXEL_CURVE_PATCH_H
+#ifndef SUBPIXEL_CURVE_PATCH_H
+#define SUBPIXEL_CURVE_PATCH_H
 
 #include <stdint.h>
 

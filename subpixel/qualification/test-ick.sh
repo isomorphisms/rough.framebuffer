@@ -34,23 +34,25 @@ case "$cc1" in
   *) echo "BLOCKED: cc1 is outside pinned ICK stage: $cc1" >&2; exit 3 ;;
 esac
 
-out="$repo_root/sublixel/build/ick"
+sh "$repo_root/qualification/test-subpixel-name.sh"
+
+out="$repo_root/subpixel/build/ick"
 mkdir -p "$out" "$repo_root/build"
 flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math -fPIC"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
-    "$repo_root/sublixel/src/curve_patch.c" -o "$out/curve_patch.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
-    "$repo_root/sublixel/tests/test_curve_patch.c" -o "$out/test_curve_patch.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
-    "$repo_root/sublixel/src/curve_patch_5x5.c" -o "$out/curve_patch_5x5.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
-    "$repo_root/sublixel/tests/test_curve_patch_5x5.c" -o "$out/test_curve_patch_5x5.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -c \
-    "$repo_root/sublixel/src/coverage_plane.c" -o "$out/coverage_plane.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -I"$repo_root/src" -c \
-    "$repo_root/src/sublixel_framebuffer.c" -o "$out/sublixel_framebuffer.o"
-"$ICK_CC" $flags -I"$repo_root/sublixel/include" -I"$repo_root/src" -c \
-    "$repo_root/sublixel/tests/test_coverage_plane.c" -o "$out/test_coverage_plane.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/src/curve_patch.c" -o "$out/curve_patch.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/tests/test_curve_patch.c" -o "$out/test_curve_patch.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/src/curve_patch_5x5.c" -o "$out/curve_patch_5x5.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/tests/test_curve_patch_5x5.c" -o "$out/test_curve_patch_5x5.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/src/coverage_plane.c" -o "$out/coverage_plane.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -I"$repo_root/src" -c \
+    "$repo_root/src/subpixel_framebuffer.c" -o "$out/subpixel_framebuffer.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -I"$repo_root/src" -c \
+    "$repo_root/subpixel/tests/test_coverage_plane.c" -o "$out/test_coverage_plane.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/src/framebuffer.c" -o "$out/framebuffer.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
@@ -60,7 +62,7 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
 
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
-              "$out/coverage_plane.o" "$out/sublixel_framebuffer.o" "$out/test_coverage_plane.o" \
+              "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" "$out/test_coverage_plane.o" \
               "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
@@ -73,7 +75,7 @@ done
 "$HOST_LINKER" "$out/curve_patch.o" "$out/curve_patch_5x5.o" \
     "$out/test_curve_patch_5x5.o" -lm -o "$out/test_curve_patch_5x5"
 "$HOST_LINKER" "$out/curve_patch.o" "$out/curve_patch_5x5.o" \
-    "$out/coverage_plane.o" "$out/sublixel_framebuffer.o" \
+    "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" \
     "$out/test_coverage_plane.o" -lm -o "$out/test_coverage_plane"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/test_raster_ick.o" \
     -lm -o "$out/test_raster_ick"
@@ -90,10 +92,10 @@ sha256sum "$ICK_CC" "$cc1" "$out/curve_patch.o" \
     "$out/test_curve_patch_5x5.o" "$out/test_curve_patch" \
     "$out/test_curve_patch_5x5" "$out/test_raster_ick" \
     "$repo_root/build/rough-fb"
-sha256sum "$out/coverage_plane.o" "$out/sublixel_framebuffer.o" \
+sha256sum "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" \
     "$out/test_coverage_plane.o" "$out/test_coverage_plane"
 "$out/test_curve_patch"
 "$out/test_curve_patch_5x5"
 "$out/test_coverage_plane"
 "$out/test_raster_ick"
-echo "ICK-compiled Sublixel 3x3 + 5x5 and framebuffer native C11 tests: PASS"
+echo "ICK-compiled Subpixel 3x3 + 5x5 and framebuffer native C11 tests: PASS"

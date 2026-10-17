@@ -1,4 +1,4 @@
-#include "sublixel/curve_patch.h"
+#include "subpixel/curve_patch.h"
 
 #include <assert.h>
 #include <math.h>
@@ -215,6 +215,6 @@ int main(void) {
     test_reparameterization_and_orientation();
     test_coverage_union_and_order();
     test_refusal_and_no_partial_mutations();
-    puts("sublixel 3x3 curve patch: PASS");
+    puts("subpixel 3x3 curve patch: PASS");
     return 0;
 }

@@ -2,7 +2,7 @@
 
 The authoritative work orchestrator is **Ike**, repository
 `dilapidated-shed/ike`, source commit `a92fe68bf8aad8dfcfe9f7a7abd84e07290f7fe0`.
-The checked `Ikefile` invokes `sublixel/qualification/test-ick.sh`.
+The checked `Ikefile` invokes `subpixel/qualification/test-ick.sh`.
 `scripts/run-ike.sh` requires absolute paths to the pinned source checkout
 and actual executable, a caller-supplied expected binary SHA-256, and an unused
 receipt path. It binds the current Ikefile SHA-256 to an `ike-build-v1`
@@ -16,14 +16,14 @@ with GCC reference submodule
 `6294f1d9e7536e5ffcde09d1528c918d63abfef5`.
 The ICK C11 compile script binds exact ICK source and **requires the driver at that checkout's staged installation path**, with `cc1` inside its staged libexec tree. Stock `/usr/bin/gcc` and success-only impostors must fail even if passed as `ICK_CC`; target triple, ELF ABI and object/executable checksums are recorded.
 
-- `sublixel/src/curve_patch.c` and `sublixel/tests/test_curve_patch.c` (quadratic 3×3)
-- `sublixel/src/curve_patch_5x5.c` and `sublixel/tests/test_curve_patch_5x5.c` (cubic 5×5)
+- `subpixel/src/curve_patch.c` and `subpixel/tests/test_curve_patch.c` (quadratic 3×3)
+- `subpixel/src/curve_patch_5x5.c` and `subpixel/tests/test_curve_patch_5x5.c` (cubic 5×5)
 - `src/framebuffer.c`, `src/main.c`, and `tests/test_raster_ick.c`
 
 All three native test programs run from the actual ICK-produced objects; the
 framebuffer CLI is assembled from ICK objects. No direct consumer GCC/Clang
 or NDK compilation jobs remain. The former GCC/Clang reference runs are
-historical only. Root and Sublixel `Makefile` are explicit GNU Make
+historical only. Root and Subpixel `Makefile` are explicit GNU Make
 refusal stubs. Ike v1 owns the dependency graph without pretending to
 parse GNU Make syntax.
 

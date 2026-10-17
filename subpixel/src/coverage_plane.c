@@ -1,4 +1,4 @@
-#include "sublixel/coverage_plane.h"
+#include "subpixel/coverage_plane.h"
 
 #include <limits.h>
 

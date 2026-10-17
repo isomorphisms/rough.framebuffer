@@ -1,4 +1,4 @@
-#include "sublixel/curve_patch.h"
+#include "subpixel/curve_patch.h"
 
 #include <math.h>
 #include <stddef.h>

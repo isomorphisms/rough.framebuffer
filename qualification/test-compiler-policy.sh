@@ -108,7 +108,7 @@ test_shadow=
 # authenticated ICK. This is a positive real rebuild, not a string-only check.
 CC=/usr/bin/gcc IKE_RECEIPT="$tmp/cc-shadow.tsv" \
     sh "$root/scripts/run-ike.sh" test > "$tmp/cc-shadow.log" 2>&1
-grep -Fq 'ICK-compiled Sublixel 3x3 + 5x5 and framebuffer native C11 tests: PASS' "$tmp/cc-shadow.log"
+grep -Fq 'ICK-compiled Subpixel 3x3 + 5x5 and framebuffer native C11 tests: PASS' "$tmp/cc-shadow.log"
 grep -Fqx "$(printf 'final_result\tPASS')" "$tmp/cc-shadow.tsv"
 
 # System GNU Make may exist for isolated stage-zero bootstrap, but its

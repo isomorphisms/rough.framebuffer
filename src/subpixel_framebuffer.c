@@ -1,4 +1,4 @@
-#include "sublixel_framebuffer.h"
+#include "subpixel_framebuffer.h"
 
 #include <limits.h>
 #include <math.h>
@@ -14,7 +14,7 @@ static unsigned rounded_byte(double unit_value) {
     return (unsigned)floor(unit_value * 255.0 + 0.5);
 }
 
-int rough_blend_sublixel_coverage(rough_framebuffer *target,
+int rough_blend_subpixel_coverage(rough_framebuffer *target,
     const cp_coverage_plane *coverage, uint32_t color, double opacity) {
     if (!target || !target->pixels || !target->width || !target->height ||
         target->width > INT_MAX || target->height > INT_MAX ||
