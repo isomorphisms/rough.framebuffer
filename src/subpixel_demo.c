@@ -1,5 +1,5 @@
-#include "sublixel_demo.h"
-#include "sublixel/curve_patch.h"
+#include "subpixel_demo.h"
+#include "subpixel/curve_patch.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -58,8 +58,8 @@ static void title(rough_framebuffer *frame, unsigned x, unsigned y,
     glyph(frame, x + 26u, y, digit, color);
 }
 
-int rough_sublixel_demo_draw(rough_framebuffer *frame,
-                             rough_sublixel_demo_layout *out_layout) {
+int rough_subpixel_demo_draw(rough_framebuffer *frame,
+                             rough_subpixel_demo_layout *out_layout) {
     if (!frame || !frame->pixels || frame->width < 190u ||
         frame->height < 130u || frame->width > 8192u ||
         frame->height > 8192u || frame->stride_pixels < frame->width)
@@ -109,7 +109,7 @@ int rough_sublixel_demo_draw(rough_framebuffer *frame,
     title(frame, left_x, 8u, '3', UINT32_C(0xff097ca2));
     title(frame, right_x, 8u, '5', UINT32_C(0xffa63873));
     if (out_layout)
-        *out_layout = (rough_sublixel_demo_layout){
+        *out_layout = (rough_subpixel_demo_layout){
             left_x, right_x, top_y, side
         };
     return 0;

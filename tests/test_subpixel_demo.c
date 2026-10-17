@@ -1,4 +1,4 @@
-#include "sublixel_demo.h"
+#include "subpixel_demo.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -10,7 +10,7 @@ static uint32_t pixel(rough_framebuffer *frame, unsigned x, unsigned y) {
     return frame->pixels[(size_t)y * frame->stride_pixels + x];
 }
 
-/* An integer-rational coverage oracle independent of Sublixel's
+/* An integer-rational coverage oracle independent of Subpixel's
  * floating-point projection and evaluation. */
 static unsigned reference_coverage(int x, int y, int cubic) {
     unsigned count = 0u;
@@ -51,8 +51,8 @@ int main(void) {
     for (unsigned i = 0; i < (unsigned)STRIDE * H; ++i)
         pixels[i] = UINT32_C(0xffffffff);
     rough_framebuffer frame = {pixels, W, H, STRIDE, NULL, 0};
-    rough_sublixel_demo_layout layout = {0};
-    assert(rough_sublixel_demo_draw(&frame, &layout) == 0);
+    rough_subpixel_demo_layout layout = {0};
+    assert(rough_subpixel_demo_draw(&frame, &layout) == 0);
     assert(layout.cell >= 12u);
     assert(layout.right_x > layout.left_x + 5u * layout.cell);
     unsigned side = layout.cell;
@@ -115,15 +115,15 @@ int main(void) {
     uint32_t *copy = malloc((size_t)STRIDE * H * sizeof(uint32_t));
     assert(copy);
     memcpy(copy, pixels, (size_t)STRIDE * H * sizeof(uint32_t));
-    assert(rough_sublixel_demo_draw(&frame, NULL) == 0);
+    assert(rough_subpixel_demo_draw(&frame, NULL) == 0);
     assert(memcmp(copy, pixels, (size_t)STRIDE * H * sizeof(uint32_t)) == 0);
 
     rough_framebuffer invalid = frame;
     invalid.width = 20;
-    assert(rough_sublixel_demo_draw(&invalid, NULL) == -1);
+    assert(rough_subpixel_demo_draw(&invalid, NULL) == -1);
     assert(memcmp(copy, pixels, (size_t)STRIDE * H * sizeof(uint32_t)) == 0);
     free(copy);
     free(pixels);
-    puts("C67 Sublixel 3x3/5x5 visual panels: PASS");
+    puts("C67 Subpixel 3x3/5x5 visual panels: PASS");
     return 0;
 }
