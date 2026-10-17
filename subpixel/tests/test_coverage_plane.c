@@ -1,5 +1,5 @@
-#include "sublixel/coverage_plane.h"
-#include "sublixel_framebuffer.h"
+#include "subpixel/coverage_plane.h"
+#include "subpixel_framebuffer.h"
 
 #include <limits.h>
 #include <math.h>
@@ -57,27 +57,27 @@ int main(void) {
     rough_framebuffer framebuffer = {
         .pixels = pixels, .width = 2, .height = 1, .stride_pixels = 4
     };
-    CHECK(rough_blend_sublixel_coverage(&framebuffer, &one,
+    CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
         UINT32_C(0xff000000), 1.0) == 0);
     CHECK(pixels[0] == UINT32_C(0xffabcdef));
     CHECK(pixels[1] == UINT32_C(0xff808080));
     CHECK(pixels[2] == UINT32_C(0x12345678) && pixels[3] == UINT32_C(0x87654321));
     pixels[1] = UINT32_C(0x800000ff);
-    CHECK(rough_blend_sublixel_coverage(&framebuffer, &one,
+    CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
         UINT32_C(0xffff0000), 1.0) == 0);
     CHECK(pixels[1] == UINT32_C(0xc0aa0055));
     uint32_t before[4];
     memcpy(before, pixels, sizeof before);
-    CHECK(rough_blend_sublixel_coverage(&framebuffer, &one,
+    CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
         UINT32_C(0xffffffff), NAN) == -1);
     CHECK(memcmp(before, pixels, sizeof before) == 0);
-    CHECK(rough_blend_sublixel_coverage(&framebuffer, &one,
+    CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
         UINT32_C(0x00ffffff), 1.0) == 0);
     CHECK(memcmp(before, pixels, sizeof before) == 0);
     one.origin_x = -1;
-    CHECK(rough_blend_sublixel_coverage(&framebuffer, &one,
+    CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
         UINT32_C(0xffffffff), 1.0) == 0);
     CHECK(memcmp(before, pixels, sizeof before) == 0);
-    puts("Sublixel caller-owned occupancy and actual framebuffer composition: PASS");
+    puts("Subpixel caller-owned occupancy and actual framebuffer composition: PASS");
     return 0;
 }
