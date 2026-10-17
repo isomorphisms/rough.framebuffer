@@ -1,15 +1,15 @@
-# Sublixel: local 3×3 and 5×5 curvature neighborhoods
+# Subpixel: local 3×3 and 5×5 curvature neighborhoods
 
 ## Reusable occupancy plane and framebuffer boundary
 
-`sublixel/coverage_plane.h` exposes bounded caller-owned occupancy storage.
+`subpixel/coverage_plane.h` exposes bounded caller-owned occupancy storage.
 The 3×3/5×5 integration functions evaluate the actual neighborhood, clip its
 global coordinates against the destination plane, and OR individual sample
 masks. Failed layout or patch checks leave occupancy unchanged. Row padding,
 negative origins and capacity arithmetic are checked. Callers clear storage
 explicitly and keep different colored shapes in separate planes.
 
-`src/sublixel_framebuffer.h` is the separate rendering boundary. It resolves
+`src/subpixel_framebuffer.h` is the separate rendering boundary. It resolves
 coverage once and source-over blends into the actual `rough_framebuffer`,
 using the documented straight-alpha byte-channel convention. Color alpha,
 opacity and sample coverage are independent factors. It owns no allocation,
@@ -35,7 +35,7 @@ fractional grayscale pixel coverage with no framebuffer, Android, Field Mouse,
 GPU, heap allocations or color-compositing dependency.
 
 This **stacked candidate** extends the quadratic 3×3 work in PR #6. It does
-not yet make the C67 renderer use Sublixel or fix jagged triangles.
+not yet make the C67 renderer use Subpixel or fix jagged triangles.
 
 ## Geometry
 
@@ -100,7 +100,7 @@ of outputs/accumulators on failure are handled transactionally.
 
 ## Build and verification: pinned Ike orchestrating pinned ICK
 
-The 3×3 and 5×5 libraries are compiled and tested with **source-built ICK**, orchestrated by pinned **Ike**, through the same `Ikefile`. The root and Sublixel GNU Makefiles deliberately refuse product builds; the old reference-only GCC/Clang jobs are historical diagnostics, not a selectable build.
+The 3×3 and 5×5 libraries are compiled and tested with **source-built ICK**, orchestrated by pinned **Ike**, through the same `Ikefile`. The root and Subpixel GNU Makefiles deliberately refuse product builds; the old reference-only GCC/Clang jobs are historical diagnostics, not a selectable build.
 
 From the repository root, with checked `ICK_CC`, `ICK_SOURCE_DIR`, `HOST_LINKER`, `IKE_BIN`, `IKE_SOURCE_DIR`, `IKE_EXPECTED_SHA256`, and a fresh `IKE_RECEIPT`:
 
@@ -119,6 +119,6 @@ Android/GPU/Field Mouse integration; antialiased 3D triangle edges; physical
 C67 validation. Existing renderer PRs remain separate.
 
 This is a **draft, unmerged, stacked extension** to
-[3×3 Sublixel PR #6](https://github.com/isomorphisms/rough.framebuffer/pull/6),
+[3×3 Subpixel PR #6](https://github.com/isomorphisms/rough.framebuffer/pull/6),
 tracked by [Flexible Pipes work envelope #77](https://github.com/isomorphisms/flexible-pipes/issues/77).
 That work envelope is not a registered dispatch or ai-ci approval.

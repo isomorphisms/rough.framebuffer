@@ -1,7 +1,7 @@
-# Sublixel real 2D curvature preview
+# Subpixel real 2D curvature preview
 
 The preview uses public `cp_coverage_plane_accumulate_3x3/5x5` to union masks,
-then `rough_blend_sublixel_coverage` to compose the actual caller-owned color
+then `rough_blend_subpixel_coverage` to compose the actual caller-owned color
 framebuffers before serializing PPM. Coverage and color planes together use
 162 KiB of fixed working storage; no heap allocation is introduced. Normalized
 byte-channel rounding can differ by one gray level from the earlier private
@@ -9,11 +9,11 @@ grayscale encoder. The producer's tests cover capacity/stride refusal,
 clipping, distinct-patch union, alpha composition and unchanged output on
 invalid input. Current-head execution must still qualify these changes.
 
-This is the first **native consumer** of the independently implemented Sublixel neighborhood APIs, not a separate rasterizer substituting the geometry model.
+This is the first **native consumer** of the independently implemented Subpixel neighborhood APIs, not a separate rasterizer substituting the geometry model.
 
 It draws the same cubic Bézier stroke with the quadratic **3×3** and cubic **5×5** local-neighborhood approximations. Every curve sample comes from the actual public `cp_patch_from_cubic` and `cp_patch_from_cubic_jet3` constructors. Each neighborhood computes its **own subpixel occupancy bits**, and overlapping local patches are merged by bitwise OR in caller-owned pixel buffers, before being converted to grayscale. This prevents duplicate local patches from artificially darkening the stroke.
 
-The two 96×72 panels are written side by side into a **192×72 P6 PPM** at `sublixel/build/curve-3x3-vs-5x5.ppm`. The implementation has fixed memory and never allocates an image-sized heap buffer. The named points vary in both x and y: it is a visibly **slanted, curved** example, not a horizontal bar or a pre-stamped mask. This demonstrates the subpixel curve coverage contract, not a universal smoothness guarantee.
+The two 96×72 panels are written side by side into a **192×72 P6 PPM** at `subpixel/build/curve-3x3-vs-5x5.ppm`. The implementation has fixed memory and never allocates an image-sized heap buffer. The named points vary in both x and y: it is a visibly **slanted, curved** example, not a horizontal bar or a pre-stamped mask. This demonstrates the subpixel curve coverage contract, not a universal smoothness guarantee.
 
 Run from the owning repository with verified environment bindings for both Ike (`IKE_BIN`, `IKE_SOURCE_DIR`, `IKE_EXPECTED_SHA256`, a fresh `IKE_RECEIPT`) and ICK (`ICK_CC`, `ICK_SOURCE_DIR`, `HOST_LINKER`):
 
