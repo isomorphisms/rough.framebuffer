@@ -3,7 +3,7 @@ CFLAGS ?= -O2 -std=c11 -Wall -Wextra -Werror -pedantic
 LDLIBS ?= -lm
 
 COMMON = src/curve_patch.c src/curve_patch_5x5.c
-HEADER = include/sublixel/curve_patch.h
+HEADER = include/subpixel/curve_patch.h
 
 .PHONY: all test test-ick test-reference clean
 

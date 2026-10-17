@@ -21,7 +21,7 @@
 #include "surface.h"
 #include "surface_aa.h"
 #include "touch.h"
-#include "sublixel_demo.h"
+#include "subpixel_demo.h"
 
 #define ROUGH_TAG "RoughFrameArt"
 #define ROUGH_MAX_WINDOW 16384
@@ -192,8 +192,8 @@ static void redraw(rough_android_state *state) {
     /* Test-only AArch64/x86_64 diagnostic, independent of the triangle
      * depth/coverage rasterizer. A1 keeps the existing app pixels. */
 #if defined(__aarch64__) || defined(__x86_64__)
-    if (rough_sublixel_demo_draw(&target, NULL) != 0) {
-        log_error("Sublixel 5x5 diagnostic panel failed");
+    if (rough_subpixel_demo_draw(&target, NULL) != 0) {
+        log_error("Subpixel 5x5 diagnostic panel failed");
         ANativeWindow_unlockAndPost(app->window);
         return;
     }
@@ -232,7 +232,7 @@ static void redraw(rough_android_state *state) {
     __android_log_print(ANDROID_LOG_INFO, ROUGH_TAG,
                         "FRAME input_seq=%lu render_seq=%lu shape=%s yaw=%.4f "
                         "distance=%.4f surface=%ux%u rendered=%ux%u "
-                        "painted=%u aa_samples=%u sublixel_panel=%s rgba_hash=%016llx",
+                        "painted=%u aa_samples=%u subpixel_panel=%s rgba_hash=%016llx",
                         state->input_sequence, state->render_sequence,
                         state->touch.shape == ROUGH_SURFACE_TORUS ? "torus" : "enneper",
                         state->touch.yaw_degrees,
