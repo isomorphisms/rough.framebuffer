@@ -1,18 +1,18 @@
 # Ike's literal v1 grammar: no GNU Make variables or implicit rules.
 # Project code is built only by ICK inside the checked recipe.
-all depends on Ikefile sublixel/qualification/test-ick.sh sublixel/include/sublixel/curve_patch.h sublixel/include/sublixel/coverage_plane.h sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c sublixel/src/coverage_plane.c src/sublixel_framebuffer.h src/sublixel_framebuffer.c src/framebuffer.c src/main.c
-    sh sublixel/qualification/test-ick.sh
+all depends on Ikefile subpixel/qualification/test-ick.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c src/framebuffer.c src/main.c
+    sh subpixel/qualification/test-ick.sh
 
-test depends on Ikefile sublixel/qualification/test-ick.sh sublixel/include/sublixel/curve_patch.h sublixel/include/sublixel/coverage_plane.h sublixel/src/curve_patch.c sublixel/src/curve_patch_5x5.c sublixel/src/coverage_plane.c src/sublixel_framebuffer.h src/sublixel_framebuffer.c sublixel/tests/test_coverage_plane.c sublixel/tests/test_curve_patch.c sublixel/tests/test_curve_patch_5x5.c tests/test_raster_ick.c
-    sh sublixel/qualification/test-ick.sh
+test depends on Ikefile subpixel/qualification/test-ick.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c subpixel/tests/test_coverage_plane.c subpixel/tests/test_curve_patch.c subpixel/tests/test_curve_patch_5x5.c tests/test_raster_ick.c
+    sh subpixel/qualification/test-ick.sh
 
 clean depends on Ikefile
-    rm -rf build sublixel/build
+    rm -rf build subpixel/build
 
 # Policy-only qualification; no GNU Make product or reference-compiler lane.
-policy-check depends on Ikefile qualification/test-compiler-policy.sh scripts/run-ike.sh sublixel/qualification/test-ick.sh
+policy-check depends on Ikefile qualification/test-compiler-policy.sh scripts/run-ike.sh subpixel/qualification/test-ick.sh
     sh qualification/test-compiler-policy.sh
 
 # Genuine consumer: 3x3/5x5 sampled Bezier coverage rendered to a P6 PPM.
-preview depends on test sublixel/examples/preview.c sublixel/examples/build-preview.sh
-    sh sublixel/examples/build-preview.sh
+preview depends on test subpixel/examples/preview.c subpixel/examples/build-preview.sh
+    sh subpixel/examples/build-preview.sh

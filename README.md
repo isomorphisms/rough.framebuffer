@@ -16,7 +16,7 @@ filled shapes, hachures, textured brushes, or stroke-width variation.
 
 The **authoritative build orchestrator is [Ike](https://github.com/dilapidated-shed/ike)** with its checked `Ikefile` and `ike-build-v1` receipt. Consumer C code is compiled exclusively by pinned source-built **[ICK](https://github.com/dilapidated-shed/ick)**. ICKY remains the developing parser; Ithon/ILua and other owned tools must be used only at stages they actually support.
 
-GNU Make is explicitly blocked by the top-level and Sublixel `Makefile` stubs. There is no `CC=cc`, GCC, Clang, NDK or GNU Make product fallback. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands a pinned compiled Ike, caller-supplied expected executable digest (independent verification pending) and fresh receipt path. Refer to [owned-toolchain qualification](sublixel/qualification/README.md).
+GNU Make is explicitly blocked by the top-level and Subpixel `Makefile` stubs. There is no `CC=cc`, GCC, Clang, NDK or GNU Make product fallback. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands a pinned compiled Ike, caller-supplied expected executable digest (independent verification pending) and fresh receipt path. Refer to [owned-toolchain qualification](subpixel/qualification/README.md).
 
 **Explicit stage-zero exceptions:** Building the GCC-derived ICK compiler still requires the system host C/C++ bootstrap toolchain and GNU Make; a declared system linker supplies Linux CRT/libc/libm after ICK generated the project and Ike objects. None of these stages compiles any consumer C source. This is not yet a self-hosting complete-toolchain claim.
 
@@ -41,16 +41,16 @@ fieldmouse src/rough.fm fixtures/scene.json scene.ops
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
 not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build and native tests; it does not run Field Mouse or substitute Node for it.
 
-Ike's `test` target executes ICK-compiled C tests for Sublixel and the framebuffer. The legacy Field Mouse integration and Python numerical oracle remain separate, unqualified under Ithon; neither runs automatically and neither is counted toward this owned-toolchain qualification.
+Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer. The legacy Field Mouse integration and Python numerical oracle remain separate, unqualified under Ithon; neither runs automatically and neither is counted toward this owned-toolchain qualification.
 
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 `disableMultiStroke`, and `color` (an RGB triplet). Supported types: `line`,
 `rectangle`, `polyline`, `polygon`.
 
-## Native Sublixel visual comparison (candidate)
+## Native Subpixel visual comparison (candidate)
 
-The ICK-built `sublixel/examples/preview.c` consumes both local curvature APIs and accumulates real 8×8 subpixel occupancy into two side-by-side 96×72 panels. It draws a genuinely slanted cubic Bézier stroke rather than a horizontal synthetic line or copied bitmap.
+The ICK-built `subpixel/examples/preview.c` consumes both local curvature APIs and accumulates real 8×8 subpixel occupancy into two side-by-side 96×72 panels. It draws a genuinely slanted cubic Bézier stroke rather than a horizontal synthetic line or copied bitmap.
 
 From a host with the pinned source-built ICK and Ike environment configured above:
 
@@ -58,7 +58,7 @@ From a host with the pinned source-built ICK and Ike environment configured abov
 sh scripts/run-ike.sh preview
 ```
 
-The resulting `sublixel/build/curve-3x3-vs-5x5.ppm` is a P6 image of size 192×72. The example runs genuine slant, partial-coverage, duplicate-union, deterministic frame and PPM format tests, then records the image SHA-256. See [the example's scope and limitations](sublixel/examples/README.md). It is a **native CPU preview only**, not an Android APK or a claimed repair of 3D triangle aliasing on C67.
+The resulting `subpixel/build/curve-3x3-vs-5x5.ppm` is a P6 image of size 192×72. The example runs genuine slant, partial-coverage, duplicate-union, deterministic frame and PPM format tests, then records the image SHA-256. See [the example's scope and limitations](subpixel/examples/README.md). It is a **native CPU preview only**, not an Android APK or a claimed repair of 3D triangle aliasing on C67.
 
 ## Pipeline
 

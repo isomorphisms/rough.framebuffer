@@ -45,10 +45,10 @@ identity=sha256:$ikfilehash
 hex_string() { printf %s "$1" | od -An -tx1 | tr -d ' \n'; }
 tab=$(printf '\t')
 case "$target" in
-    all|test) expected_recipe='sh sublixel/qualification/test-ick.sh' ;;
-    clean) expected_recipe='rm -rf build sublixel/build' ;;
+    all|test) expected_recipe='sh subpixel/qualification/test-ick.sh' ;;
+    clean) expected_recipe='rm -rf build subpixel/build' ;;
     policy-check) expected_recipe='sh qualification/test-compiler-policy.sh' ;;
-    preview) expected_recipe='sh sublixel/examples/build-preview.sh' ;;
+    preview) expected_recipe='sh subpixel/examples/build-preview.sh' ;;
 esac
 hex_target=$(hex_string "$target")
 hex_identity=$(hex_string "$identity")
@@ -74,7 +74,7 @@ match_line() {
     match_line "recipe_runner_identity_hex${tab}$hex_runner"
     if [ "$target" = preview ]; then
         hex_test=$(hex_string test)
-        hex_test_recipe=$(hex_string 'sh sublixel/qualification/test-ick.sh')
+        hex_test_recipe=$(hex_string 'sh subpixel/qualification/test-ick.sh')
         match_line "rule${tab}0${tab}$hex_test"
         match_line "recipe${tab}1${tab}$hex_test${tab}$hex_test_recipe${tab}0"
         match_line "rule${tab}2${tab}$hex_target"
