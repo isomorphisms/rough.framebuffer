@@ -48,6 +48,7 @@ build/test-subpixel5-reference: subpixel/tests/test_curve_patch_5x5.c subpixel/s
 	$(CC) $(CFLAGS) -Isubpixel/include subpixel/tests/test_curve_patch_5x5.c subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c -o $@ $(LDLIBS)
 
 test: build/test-subpixel-demo-reference build/test-subpixel5-reference build/rough-fb build/rough-surface build/test-api build/test-surface build/test-touch build/test-present build/test-rotation-grab build/test-surface-aa
+	CC=$(CC) sh ci/test-subpixel-naming.sh
 	./build/test-subpixel-demo-reference
 	./build/test-subpixel5-reference
 	./build/test-api

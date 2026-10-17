@@ -116,3 +116,11 @@ The shared local frame uses **T=(4/5,3/5)** (about 37° down toward the right in
 The existing torus/Enneper rendering continues below the panels, including native 2×2 per-sample depth/coverage, front-side-following horizontal drag, vertical zoom, tap shape switching, and the prior RGBA presentation. The 5×5 panel **does not anti-alias the 3D triangle edges** and should not be judged for that. Users can report physical C67 installation, presence/layout of both grids, aliasing in the preexisting surfaces, drag direction, and responsiveness independently. The same proposed test-only package ID/signer is reused for updating the existing APK; no new key is generated.
 
 This is a device diagnostic from [Subpixel PR #8](https://github.com/isomorphisms/rough.framebuffer/pull/8), [C67 renderer PR #7](https://github.com/isomorphisms/rough.framebuffer/pull/7), and [Flexible Pipes #77](https://github.com/isomorphisms/flexible-pipes/issues/77). It is not merged to either parent or a registered dispatch/ai-ci acceptance. Android C67 build uses the explicit NDK path for the still-unqualified ICK Android NativeActivity ABI closure and does not change ICK's mandatory compiler lane for library source qualification.
+
+### Terminology transition
+
+Active C67 diagnostic source and logs now name the 3×3/5×5 subsystem **subpixel**.
+Historical draft PR titles, commit objects, screenshots and receipt names remain unchanged;
+this is a separate naming-only candidate under [SUN #120](https://github.com/isomorphisms/flexible-pipes/issues/120).
+Host GNU Make/GCC/Clang tests here remain reference/diagnostic checks and are **not**
+ICK Android application qualification or physical device acceptance.

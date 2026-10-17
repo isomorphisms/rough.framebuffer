@@ -20,6 +20,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Reject obsolete subpixel paths and identifiers
+        run: |
+          set -eu
+          CC=${{ matrix.compiler }} sh ci/test-subpixel-naming.sh
       - name: Strict native integration
         run: |
           set -eu
