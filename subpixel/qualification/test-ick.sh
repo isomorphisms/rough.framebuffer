@@ -1,7 +1,7 @@
 #!/bin/sh
-# Compile Sublixel's whole test workload as C11 with the pinned source-built ICK.
+# Compile Subpixel's whole test workload as C11 with the pinned source-built ICK.
 # The named system linker consumes only ICK-produced objects. It does not
-# compile any Sublixel translation unit.
+# compile any Subpixel translation unit.
 set -eu
 repo_root=$(CDPATH= cd "$(dirname "$0")/../.." && pwd)
 : "${ICK_CC:?set ICK_CC to the absolute pinned ICK compiler driver}"
@@ -34,16 +34,16 @@ case "$cc1" in
   *) echo "ICK cc1 escaped its pinned compiler installation: $cc1" >&2; exit 3 ;;
 esac
 
-output_dir="$repo_root/sublixel/build/ick"
+output_dir="$repo_root/subpixel/build/ick"
 mkdir -p "$output_dir"
 flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math"
 # Deliberate ordinary C dialect: ICKY's replacement parser is not yet adopted.
 # Separate -c invocations must not silently invoke host GCC or Clang as a C compiler.
 for stem in curve_patch curve_patch_5x5; do
-    "$ICK_CC" $flags -I"$repo_root/sublixel/include" -c "$repo_root/sublixel/src/$stem.c" -o "$output_dir/$stem.o"
+    "$ICK_CC" $flags -I"$repo_root/subpixel/include" -c "$repo_root/subpixel/src/$stem.c" -o "$output_dir/$stem.o"
 done
 for stem in test_curve_patch test_curve_patch_5x5; do
-    "$ICK_CC" $flags -I"$repo_root/sublixel/include" -c "$repo_root/sublixel/tests/$stem.c" -o "$output_dir/$stem.o"
+    "$ICK_CC" $flags -I"$repo_root/subpixel/include" -c "$repo_root/subpixel/tests/$stem.c" -o "$output_dir/$stem.o"
 done
 for stem in curve_patch curve_patch_5x5 test_curve_patch test_curve_patch_5x5; do
     readelf -h "$output_dir/$stem.o" | grep -q 'Class:.*ELF64'
@@ -63,4 +63,4 @@ sha256sum "$ICK_CC" "$cc1" \
     "$output_dir/test_curve_patch" "$output_dir/test_curve_patch_5x5"
 "$output_dir/test_curve_patch"
 "$output_dir/test_curve_patch_5x5"
-printf '%s\n' 'Sublixel 3x3+5x5 ICK x86_64 C11 compile/object/link/run: PASS'
+printf '%s\n' 'Subpixel 3x3+5x5 ICK x86_64 C11 compile/object/link/run: PASS'

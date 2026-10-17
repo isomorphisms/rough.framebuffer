@@ -1,4 +1,4 @@
-# Sublixel: local 3×3 and 5×5 curvature neighborhoods
+# Subpixel: local 3×3 and 5×5 curvature neighborhoods
 
 An independent C11 curve-neighborhood library underneath the
 `rough.framebuffer` workspace. It computes local curve geometry and
@@ -6,7 +6,7 @@ fractional grayscale pixel coverage with no framebuffer, Android, Field Mouse,
 GPU, heap allocations or color-compositing dependency.
 
 This **stacked candidate** extends the quadratic 3×3 work in PR #6. It does
-not yet make the C67 renderer use Sublixel or fix jagged triangles.
+not yet make the C67 renderer use Subpixel or fix jagged triangles.
 
 ## Geometry
 
@@ -72,7 +72,7 @@ of outputs/accumulators on failure are handled transactionally.
 ## Build and verification: ICK is required
 
 The maintained **ICK C compiler** is the intended production compiler.
-The `make test-sublixel` route does *not* fall back to GCC or Clang.
+The `make test-subpixel` route does *not* fall back to GCC or Clang.
 See `qualification/README.md` for the exact pinned source, source-built
 x86_64 driver, verified `cc1`, explicit object linker, ELF/hash receipts
 and further Android qualification requirements.
@@ -80,17 +80,17 @@ and further Android qualification requirements.
 After building that exact ICK toolchain, supply `ICK_CC`,
 `ICK_SOURCE_DIR` and `HOST_LINKER` and run:
 
-    make test-sublixel
+    make test-subpixel
 
 All four C11 translation units (both curve implementations and both
 test suites) are compiled as ICK objects, then linked and executed.
 
 Separate, **reference-only** GCC and Clang checks:
 
-    make test-sublixel-reference CC=gcc
-    make test-sublixel-reference CC=clang
-    make -C sublixel clean
-    make test-sublixel-reference CC=clang CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
+    make test-subpixel-reference CC=gcc
+    make test-subpixel-reference CC=clang
+    make -C subpixel clean
+    make test-subpixel-reference CC=clang CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
 
 The original 3×3 tests remain mandatory. The 5×5 suite checks a separate
 **integer-rational oracle** for the asymmetric graph
@@ -112,6 +112,6 @@ Android/GPU/Field Mouse integration; antialiased 3D triangle edges; physical
 C67 validation. Existing renderer PRs remain separate.
 
 This is a **draft, unmerged, stacked extension** to
-[3×3 Sublixel PR #6](https://github.com/isomorphisms/rough.framebuffer/pull/6),
+[3×3 Subpixel PR #6](https://github.com/isomorphisms/rough.framebuffer/pull/6),
 tracked by [Flexible Pipes work envelope #77](https://github.com/isomorphisms/flexible-pipes/issues/77).
 That work envelope is not a registered dispatch or ai-ci approval.

@@ -1,4 +1,4 @@
-#include "sublixel/curve_patch.h"
+#include "subpixel/curve_patch.h"
 
 #include <assert.h>
 #include <math.h>
@@ -66,7 +66,7 @@ static void test_integer_lattice_cubic_oracle(void) {
      * For v=u^2/4+u^3/16, 65536*(v-graph) =
      * 4096*nv -64*nu^2 -nu^3.
      * half_width=3/16 => bound 12288; valid_u=3 => |nu|<=48.
-     * This path does not call any Sublixel geometry or mask helper. */
+     * This path does not call any Subpixel geometry or mask helper. */
     const unsigned expected[5][5] = {
         {0, 0, 0, 0, 0},
         {0, 0, 0, 0, 0},
@@ -273,6 +273,6 @@ int main(void) {
     test_nonlinear_reparameterization_and_reversal();
     test_vertical_horizontal_and_union();
     test_errors_are_transactional();
-    puts("sublixel 5x5 cubic neighborhoods: PASS");
+    puts("subpixel 5x5 cubic neighborhoods: PASS");
     return 0;
 }
