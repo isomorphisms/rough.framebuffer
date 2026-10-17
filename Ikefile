@@ -1,16 +1,16 @@
 # Ike's literal v1 grammar: no GNU Make variables or implicit rules.
 # Project code is built only by ICK inside the checked recipe.
-all depends on Ikefile subpixel/qualification/test-ick.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c src/framebuffer.c src/main.c
-    sh subpixel/qualification/test-ick.sh
+all depends on Ikefile subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c src/framebuffer.c src/main.c
+    sh subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh
 
-test depends on Ikefile subpixel/qualification/test-ick.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c subpixel/tests/test_coverage_plane.c subpixel/tests/test_curve_patch.c subpixel/tests/test_curve_patch_5x5.c tests/test_raster_ick.c
-    sh subpixel/qualification/test-ick.sh
+test depends on Ikefile subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c subpixel/tests/test_coverage_plane.c subpixel/tests/test_curve_patch.c subpixel/tests/test_curve_patch_5x5.c tests/test_raster_ick.c
+    sh subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh
 
 clean depends on Ikefile
     rm -rf build subpixel/build
 
 # Policy-only qualification; no GNU Make product or reference-compiler lane.
-policy-check depends on Ikefile qualification/test-compiler-policy.sh scripts/run-ike.sh subpixel/qualification/test-ick.sh
+policy-check depends on Ikefile qualification/test-compiler-policy.sh scripts/run-ike.sh subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh
     sh qualification/test-compiler-policy.sh
 
 # Genuine consumer: 3x3/5x5 sampled Bezier coverage rendered to a P6 PPM.

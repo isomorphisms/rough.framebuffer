@@ -34,6 +34,8 @@ case "$cc1" in
   *) echo "BLOCKED: cc1 is outside pinned ICK stage: $cc1" >&2; exit 3 ;;
 esac
 
+sh "$repo_root/qualification/test-subpixel-name.sh"
+
 out="$repo_root/subpixel/build/ick"
 mkdir -p "$out" "$repo_root/build"
 flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-math -fPIC"

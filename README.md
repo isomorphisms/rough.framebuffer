@@ -91,3 +91,13 @@ original source from archived [Processing.js v1.6.6](https://github.com/processi
 including its license and authors. It is read-only comparison material for drawing,
 transforms, shapes, parsing, and touch/mouse input, **not a build or runtime
 requirement** of the Field Mouse/C framebuffer pipeline.
+
+## Subpixel terminology
+
+Current product code, headers, paths, executables, diagnostics and workflows use **subpixel**.
+The original GitHub issues, PR titles, immutable commits and previously generated receipts
+retain their historical spelling; they are not executable interfaces. This migration
+is tracked in [SUN #120](https://github.com/isomorphisms/flexible-pipes/issues/120).
+The `test`/`preview` Ike recipes run the naming gate, which rejects tracked stale
+paths/text and attempts to compile two intentionally obsolete interface probes using
+pinned ICK. The native coverage and composition source mathematics are unchanged.
