@@ -29,6 +29,14 @@ static int test_glyph(char name, unsigned ordinal) {
     CHECK(sf57_validate_glyph(glyph));
     CHECK(glyph->advance == 6.0 && glyph->bearing_x == 0.0 &&
           glyph->baseline == 6.5);
+    CHECK(glyph->segments[0].kind == SF57_CUBIC);
+    if (name == 'O')
+        CHECK(glyph->subpath_count == 1 && glyph->subpaths[0].closed);
+    if (name == 'C' || name == 'S')
+        CHECK(glyph->subpath_count == 1 && !glyph->subpaths[0].closed);
+    if (name == '8')
+        CHECK(glyph->subpath_count == 2 && glyph->subpaths[0].closed &&
+              glyph->subpaths[1].closed);
     for (unsigned row = 0; row < SF57_ROWS; ++row)
         for (unsigned column = 0; column < SF57_COLUMNS; ++column)
             CHECK(sf57_bitmap_cell(glyph, column, row) ==
@@ -41,8 +49,8 @@ static int test_glyph(char name, unsigned ordinal) {
     CHECK(memcmp(forward, reverse, sizeof forward) == 0);
     CHECK(memcmp(forward_counts, reverse_counts, sizeof forward_counts) == 0);
     unsigned fractional = 0, occupied = 0;
-    for (size_t cell = 0; cell < SF57_CELL_COUNT; ++cell) {
-        CHECK(forward_counts[cell] == popcount64(forward[cell]));
+    for (size_t cell = 0; cell < (size_t)SF57_CELL_COUNT; ++cell) {
+        CHECK((unsigned)forward_counts[cell] == popcount64(forward[cell]));
         if (forward_counts[cell] != 0) ++occupied;
         if (forward_counts[cell] > 0 && forward_counts[cell] < 64) ++fractional;
     }

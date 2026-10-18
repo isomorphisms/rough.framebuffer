@@ -89,7 +89,7 @@ int sf57_validate_glyph(const sf57_glyph *glyph) {
         return 0;
     for (unsigned row = 0; row < SF57_ROWS; ++row) {
         if (!glyph->bitmap_rows[row] ||
-            strlen(glyph->bitmap_rows[row]) != SF57_COLUMNS)
+            strlen(glyph->bitmap_rows[row]) != (size_t)SF57_COLUMNS)
             return 0;
         for (unsigned column = 0; column < SF57_COLUMNS; ++column)
             if (glyph->bitmap_rows[row][column] != '.' &&

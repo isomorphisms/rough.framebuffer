@@ -29,7 +29,7 @@ static int dump_glyph(char name) {
     for (unsigned row = 0; row < SF57_ROWS; ++row) {
         for (unsigned column = 0; column < SF57_COLUMNS; ++column) {
             size_t cell = (size_t)row * SF57_COLUMNS + column;
-            printf("%2u:%016" PRIx64 "%c", counts[cell], masks[cell],
+            printf("%2u:%016" PRIx64 "%c", (unsigned)counts[cell], masks[cell],
                    column + 1 == SF57_COLUMNS ? '\n' : ' ');
         }
     }
