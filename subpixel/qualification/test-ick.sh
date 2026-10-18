@@ -53,6 +53,12 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/src/subpixel_framebuffer.c" -o "$out/subpixel_framebuffer.o"
 "$ICK_CC" $flags -I"$repo_root/subpixel/include" -I"$repo_root/src" -c \
     "$repo_root/subpixel/tests/test_coverage_plane.c" -o "$out/test_coverage_plane.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/examples" -c \
+    "$repo_root/subpixel/examples/font_5x7.c" -o "$out/font_5x7.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/examples" -c \
+    "$repo_root/subpixel/tests/test_font_5x7.c" -o "$out/test_font_5x7.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/examples" -c \
+    "$repo_root/subpixel/examples/font_5x7_dump.c" -o "$out/font_5x7_dump.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/src/framebuffer.c" -o "$out/framebuffer.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
@@ -63,6 +69,7 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
               "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" "$out/test_coverage_plane.o" \
+              "$out/font_5x7.o" "$out/test_font_5x7.o" "$out/font_5x7_dump.o" \
               "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
@@ -77,6 +84,10 @@ done
 "$HOST_LINKER" "$out/curve_patch.o" "$out/curve_patch_5x5.o" \
     "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" \
     "$out/test_coverage_plane.o" -lm -o "$out/test_coverage_plane"
+"$HOST_LINKER" "$out/font_5x7.o" "$out/test_font_5x7.o" \
+    -lm -o "$out/test_font_5x7"
+"$HOST_LINKER" "$out/font_5x7.o" "$out/font_5x7_dump.o" \
+    -lm -o "$out/font_5x7_dump"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/test_raster_ick.o" \
     -lm -o "$out/test_raster_ick"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/rough_main.o" \
@@ -93,9 +104,15 @@ sha256sum "$ICK_CC" "$cc1" "$out/curve_patch.o" \
     "$out/test_curve_patch_5x5" "$out/test_raster_ick" \
     "$repo_root/build/rough-fb"
 sha256sum "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" \
-    "$out/test_coverage_plane.o" "$out/test_coverage_plane"
+    "$out/test_coverage_plane.o" "$out/test_coverage_plane" \
+    "$out/font_5x7.o" "$out/test_font_5x7.o" "$out/test_font_5x7" \
+    "$out/font_5x7_dump.o" "$out/font_5x7_dump"
 "$out/test_curve_patch"
 "$out/test_curve_patch_5x5"
 "$out/test_coverage_plane"
+"$out/test_font_5x7"
+"$out/font_5x7_dump" > "$out/font-5x7-subpixels.txt"
+test -s "$out/font-5x7-subpixels.txt"
+sha256sum "$out/font-5x7-subpixels.txt"
 "$out/test_raster_ick"
 echo "ICK-compiled Subpixel 3x3 + 5x5 and framebuffer native C11 tests: PASS"
