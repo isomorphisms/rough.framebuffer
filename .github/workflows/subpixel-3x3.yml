@@ -227,3 +227,11 @@ jobs:
           path: subpixel/build/curve-3x3-vs-5x5.ppm
           if-no-files-found: error
           retention-days: 14
+
+      - name: Retain exact 5x7 font subpixel lattices
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: subpixel-font-5x7-lattices
+          path: subpixel/build/ick/font-5x7-subpixels.txt
+          if-no-files-found: error
+          retention-days: 14
