@@ -110,7 +110,7 @@ int main(int argc,char **argv) {
     uint64_t *reference=baseline?NULL:malloc(words*sizeof *reference);
     if(!pixels||(!baseline&&(!occupancy||!candidate||!reference))){free(pixels);free(occupancy);free(candidate);free(reference);return 1;}
     for(size_t i=0;i<words;i++)pixels[i]=background;
-    rough_framebuffer frame={pixels,width,height,width};
+    rough_framebuffer frame={pixels,width,height,width,NULL,0};
     cp_coverage_plane plane={occupancy,words,width,width,height,0,0};
     cp_path_workspace scratch={candidate,reference,words};
     cp_path_report reports[MAX_SHAPES];double elapsed[MAX_SHAPES];

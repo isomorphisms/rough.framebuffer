@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native coverage, taper, alpha, clipping, and parser tests."""
+"""Native stroke, triangle, depth, clipping, and parser tests."""
 from pathlib import Path
 from subprocess import run
 from tempfile import TemporaryDirectory
@@ -82,7 +82,73 @@ with TemporaryDirectory() as directory:
     assert pixel(pixels, 20, 12, 5) != b"\xff\xff\xff"
     assert pixel(pixels, 20, 8, 5) != b"\xff\xff\xff"
 
-    # Long, extra, or out-of-range fields cannot enter the native parser.
+    # Dotted paths preserve phase through an exact corner/joint, including
+    # when neighboring segments have different directions.
+    operations.write_text(
+        "P 0 0 0\nA 0.5\nW 1\nD 2 6\nM 2 2\nL 16 2\nL 16 18\n"
+        "M 2 25\nL 18 25\n"
+    )
+    run([exe, str(operations), str(output), "30", "30"], check=True)
+    pixels = pixels_from(output, 30, 30)
+    assert pixel(pixels, 30, 3, 2) == bytes((128, 128, 128))
+    assert pixel(pixels, 30, 7, 2) == b"\xff\xff\xff"
+    assert pixel(pixels, 30, 11, 2) == bytes((128, 128, 128))
+    assert pixel(pixels, 30, 16, 3) == b"\xff\xff\xff"
+    assert pixel(pixels, 30, 16, 5) == bytes((128, 128, 128))
+    assert pixel(pixels, 30, 3, 25) == bytes((128, 128, 128))
+
+    # Pattern distances include clipped-off travel (viewport never resets it).
+    operations.write_text("P 0 0 0\nD 2 6\nM -100 4\nL 6 4\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True, timeout=5)
+    pixels = pixels_from(output, 30, 30)
+    assert pixel(pixels, 30, 0, 4) == b"\xff\xff\xff"
+    assert pixel(pixels, 30, 4, 4) == b"\x00\x00\x00"
+
+    # D 0 0 restores solid strokes; alpha remains independent of dash state.
+    operations.write_text("P 0 0 0\nD 2 6\nD 0 0\nM 2 9\nL 18 9\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True)
+    pixels = pixels_from(output, 30, 30)
+    assert pixel(pixels, 30, 7, 9) == b"\x00\x00\x00"
+
+    # Triangle winding is irrelevant, while the top-left rule makes two faces
+    # tile a rectangle without a diagonal crack or double-owned sample.
+    operations.write_text(
+        "P 20 80 220\n"
+        "T 2 2 0.4 10 2 0.4 10 10 0.4\n"
+        "T 2 2 0.4 10 10 0.4 2 10 0.4\n"
+    )
+    run([exe, str(operations), str(output), "14", "14"], check=True)
+    pixels = pixels_from(output, 14, 14)
+    for y in range(2, 10):
+        for x in range(2, 10):
+            assert pixel(pixels, 14, x, y) == bytes((20, 80, 220)), (x, y)
+    assert pixel(pixels, 14, 10, 5) == b"\xff\xff\xff"
+    assert pixel(pixels, 14, 5, 10) == b"\xff\xff\xff"
+
+    # A farther triangle submitted later cannot overwrite a nearer one.
+    operations.write_text(
+        "P 30 60 220\n"
+        "T 2 2 0.2 18 2 0.2 2 18 0.2\n"
+        "P 220 40 30\n"
+        "T 2 2 0.8 18 2 0.8 2 18 0.8\n"
+    )
+    run([exe, str(operations), str(output), "20", "20"], check=True)
+    pixels = pixels_from(output, 20, 20)
+    assert pixel(pixels, 20, 4, 4) == bytes((30, 60, 220))
+
+    # Screen-space barycentric depth interpolation can cross another face.
+    operations.write_text(
+        "P 20 190 70\n"
+        "T 2 2 0.5 18 2 0.5 2 18 0.5\n"
+        "P 220 40 40\n"
+        "T 2 2 0.1 18 2 0.9 2 18 0.9\n"
+    )
+    run([exe, str(operations), str(output), "20", "20"], check=True)
+    pixels = pixels_from(output, 20, 20)
+    assert pixel(pixels, 20, 3, 3) == bytes((220, 40, 40))
+    assert pixel(pixels, 20, 12, 3) == bytes((20, 190, 70))
+
+    # Long, extra, nonfinite, or out-of-range fields cannot enter the renderer.
     malformed = [
         "M 0 0 junk\n",
         "M " + "0 " * 500 + "\n",
@@ -92,6 +158,17 @@ with TemporaryDirectory() as directory:
         "A 1.1\n",
         "M 0 0\nL 1 1 2 3\n",
         "M 0 0\nC 1 1 2 2 3 3 4 5\n",
+        "D 1\n",
+        "D 1 0\n",
+        "D 0 1\n",
+        "D -1 4\n",
+        "D 0.001 8\n",
+        "D 1 4 5\n",
+
+        "T 0 0 0 1 0 0 0 1\n",
+        "T 0 0 0 1 0 0 0 1 0 2\n",
+        "T 0 0 NaN 1 0 0 0 1 0\n",
+        "T 0 0 1e39 1 0 0 0 1 0\n",
     ]
     for text in malformed:
         operations.write_text(text)
@@ -99,4 +176,4 @@ with TemporaryDirectory() as directory:
             [exe, str(operations), str(output), "20", "10"], capture_output=True
         ).returncode != 0, text
 
-print("native coverage fixture: PASS")
+print("native raster fixtures: PASS")

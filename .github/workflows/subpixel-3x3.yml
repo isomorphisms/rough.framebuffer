@@ -14,10 +14,14 @@ on:
       - 'src/subpixel_framebuffer.h'
       - 'src/main.c'
       - 'tests/test_raster_ick.c'
+      - 'tests/test_api.c'
+      - 'tests/test_raster.py'
       - '.github/workflows/subpixel-3x3.yml'
   push:
     branches:
       - 'subpixel/**'
+      - 'sun/120-subpixel-preview'
+      - 'main'
     paths:
       - 'subpixel/**'
       - 'Makefile'
@@ -31,6 +35,8 @@ on:
       - 'src/subpixel_framebuffer.h'
       - 'src/main.c'
       - 'tests/test_raster_ick.c'
+      - 'tests/test_api.c'
+      - 'tests/test_raster.py'
       - '.github/workflows/subpixel-3x3.yml'
 
 permissions:
@@ -219,6 +225,9 @@ jobs:
           grep -Fxq $'final_result\tPASS' "$IKE_RECEIPT"
           sha256sum subpixel/build/curve-3x3-vs-5x5.ppm
           cat "$IKE_RECEIPT"
+
+      - name: Retain the existing raster oracle as explicit CPython migration debt
+        run: python3 tests/test_raster.py build/rough-fb
 
       - name: Retain exact ICK-generated PPM for inspection
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

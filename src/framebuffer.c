@@ -2,11 +2,13 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <float.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_SURFACE_DIMENSION 1000000u
 #define MAX_STROKE_WIDTH 1000000.0
 #define CURVE_TOLERANCE 0.25
 #define CURVE_MAX_DEPTH 18
@@ -31,6 +33,24 @@ static int parse_numbers(const char *text, double *values, int capacity) {
         ++count;
         text = end;
     }
+}
+
+static int valid_layout(unsigned width, unsigned height, unsigned stride, size_t element_size) {
+    if (!width || !height || width > MAX_SURFACE_DIMENSION || height > MAX_SURFACE_DIMENSION ||
+        stride < width) return 0;
+    size_t row = (size_t)height - 1u;
+    size_t column = (size_t)width - 1u;
+    if (row > (SIZE_MAX - column) / (size_t)stride) return 0;
+    size_t last_index = row * (size_t)stride + column;
+    return last_index <= SIZE_MAX / element_size;
+}
+
+static int valid_target(const rough_framebuffer *fb) {
+    if (!fb || !fb->pixels ||
+        !valid_layout(fb->width, fb->height, fb->stride_pixels, sizeof *fb->pixels)) return 0;
+    if (fb->depth &&
+        !valid_layout(fb->width, fb->height, fb->depth_stride, sizeof *fb->depth)) return 0;
+    return 1;
 }
 
 static double clamp_unit(double value) {
@@ -75,6 +95,93 @@ static void blend_pixel(rough_framebuffer *fb, int x, int y, uint32_t color, dou
         (uint32_t)(byte_from_unit(output_red) << 16) |
         (uint32_t)(byte_from_unit(output_green) << 8) |
         (uint32_t)byte_from_unit(output_blue);
+}
+
+static double edge_value(rough_vertex start, rough_vertex end, double x, double y) {
+    return (end.x - start.x) * (y - start.y) -
+           (end.y - start.y) * (x - start.x);
+}
+
+/* With y increasing downward and positive signed area, these are the top and
+ * left members of a half-open edge pair. Reversing an edge reverses ownership. */
+static int top_left_edge(rough_vertex start, rough_vertex end) {
+    double dx = end.x - start.x;
+    double dy = end.y - start.y;
+    return dy < 0.0 || (dy == 0.0 && dx > 0.0);
+}
+
+static int inside_edge(double value, int inclusive) {
+    return value > 0.0 || (value == 0.0 && inclusive);
+}
+
+static int valid_vertex(rough_vertex vertex) {
+    return isfinite(vertex.x) && isfinite(vertex.y) && isfinite(vertex.depth) &&
+           fabs(vertex.depth) <= FLT_MAX;
+}
+
+int rough_fill_triangle(rough_framebuffer *fb,
+                        rough_vertex vertex0,
+                        rough_vertex vertex1,
+                        rough_vertex vertex2,
+                        uint32_t color,
+                        double opacity) {
+    if (!valid_target(fb) || !valid_vertex(vertex0) || !valid_vertex(vertex1) ||
+        !valid_vertex(vertex2) || !isfinite(opacity) || opacity < 0.0 || opacity > 1.0) return -1;
+    if (opacity == 0.0) return 0;
+
+    double area = edge_value(vertex0, vertex1, vertex2.x, vertex2.y);
+    if (!isfinite(area)) return -1;
+    if (area == 0.0) return 0;
+    if (area < 0.0) {
+        rough_vertex temporary = vertex1;
+        vertex1 = vertex2;
+        vertex2 = temporary;
+        area = -area;
+    }
+
+    double minimum_x = fmin(vertex0.x, fmin(vertex1.x, vertex2.x));
+    double maximum_x = fmax(vertex0.x, fmax(vertex1.x, vertex2.x));
+    double minimum_y = fmin(vertex0.y, fmin(vertex1.y, vertex2.y));
+    double maximum_y = fmax(vertex0.y, fmax(vertex1.y, vertex2.y));
+    if (maximum_x < 0.0 || maximum_y < 0.0 ||
+        minimum_x > (double)fb->width - 1.0 || minimum_y > (double)fb->height - 1.0) return 0;
+
+    int first_x = (int)ceil(fmax(0.0, minimum_x));
+    int last_x = (int)floor(fmin((double)fb->width - 1.0, maximum_x));
+    int first_y = (int)ceil(fmax(0.0, minimum_y));
+    int last_y = (int)floor(fmin((double)fb->height - 1.0, maximum_y));
+    if (first_x > last_x || first_y > last_y) return 0;
+
+    int edge0_inclusive = top_left_edge(vertex1, vertex2);
+    int edge1_inclusive = top_left_edge(vertex2, vertex0);
+    int edge2_inclusive = top_left_edge(vertex0, vertex1);
+
+    for (int y = first_y; y <= last_y; ++y) {
+        for (int x = first_x; x <= last_x; ++x) {
+            double edge0 = edge_value(vertex1, vertex2, (double)x, (double)y);
+            double edge1 = edge_value(vertex2, vertex0, (double)x, (double)y);
+            double edge2 = edge_value(vertex0, vertex1, (double)x, (double)y);
+            if (!inside_edge(edge0, edge0_inclusive) ||
+                !inside_edge(edge1, edge1_inclusive) ||
+                !inside_edge(edge2, edge2_inclusive)) continue;
+
+            double weight0 = edge0 / area;
+            double weight1 = edge1 / area;
+            double weight2 = edge2 / area;
+            double fragment_depth = weight0 * vertex0.depth +
+                                    weight1 * vertex1.depth +
+                                    weight2 * vertex2.depth;
+            if (!isfinite(fragment_depth) || fabs(fragment_depth) > FLT_MAX) return -1;
+
+            if (fb->depth) {
+                size_t depth_index = (size_t)y * fb->depth_stride + (unsigned)x;
+                if (!(fragment_depth < (double)fb->depth[depth_index])) continue;
+                fb->depth[depth_index] = (float)fragment_depth;
+            }
+            blend_pixel(fb, x, y, color, opacity);
+        }
+    }
+    return 0;
 }
 
 static int valid_width(double width) {
@@ -130,7 +237,7 @@ static int clip_segment(rough_framebuffer *fb,
 
 /* Pixel centers lie on integer coordinates, preserving the original fixture's
  * mapping. Coverage uses a one-pixel linear antialiasing fringe. */
-static void stroke_segment(rough_framebuffer *fb,
+static void stroke_segment_solid(rough_framebuffer *fb,
                            double x0, double y0, double x1, double y1,
                            double width0, double width1,
                            uint32_t color, double opacity) {
@@ -169,6 +276,55 @@ static void stroke_segment(rough_framebuffer *fb,
     }
 }
 
+/* The pattern phase is measured along un-clipped geometry, in pixel units.
+ * This makes dots continuous through consecutive L segments and across the
+ * adaptive chord subdivision of C. Only visible intervals are visited. */
+static void stroke_segment(rough_framebuffer *fb,
+                           double x0, double y0, double x1, double y1,
+                           double width0, double width1,
+                           uint32_t color, double opacity,
+                           double dash_on, double dash_off, double *phase) {
+    if (dash_on == 0.0 && dash_off == 0.0) {
+        stroke_segment_solid(fb, x0, y0, x1, y1, width0, width1, color, opacity);
+        return;
+    }
+    double length = hypot(x1 - x0, y1 - y0);
+    if (!isfinite(length)) return;
+    if (length == 0.0) {
+        stroke_segment_solid(fb, x0, y0, x1, y1, width0, width1, color, opacity);
+        return;
+    }
+    double period = dash_on + dash_off;
+    double start_phase = *phase;
+    *phase = fmod(start_phase + fmod(length, period), period);
+
+    double ax = x0, ay = y0, bx = x1, by = y1;
+    double aw = width0, bw = width1;
+    if (!clip_segment(fb, &ax, &ay, &bx, &by, &aw, &bw)) return;
+    double begin = hypot(ax - x0, ay - y0);
+    double end = length - hypot(x1 - bx, y1 - by);
+    if (!(begin < end)) return;
+
+    for (double position = begin; position < end;) {
+        double cycle = fmod(start_phase + fmod(position, period), period);
+        double interval = cycle < dash_on ? dash_on - cycle : period - cycle;
+        double next = fmin(end, position + interval);
+        if (!(next > position)) break; /* overflow/rounding cannot hang drawing */
+        if (cycle < dash_on) {
+            double t0 = position / length, t1 = next / length;
+            stroke_segment_solid(fb,
+                                 x0 + (x1 - x0) * t0,
+                                 y0 + (y1 - y0) * t0,
+                                 x0 + (x1 - x0) * t1,
+                                 y0 + (y1 - y0) * t1,
+                                 width0 + (width1 - width0) * t0,
+                                 width0 + (width1 - width0) * t1,
+                                 color, opacity);
+        }
+        position = next;
+    }
+}
+
 static point midpoint(point a, point b) {
     point result = {a.x * 0.5 + b.x * 0.5, a.y * 0.5 + b.y * 0.5};
     return result;
@@ -202,8 +358,12 @@ static int cubic_outside(rough_framebuffer *fb, point p0, point p1, point p2, po
 static void stroke_cubic(rough_framebuffer *fb,
                          point p0, point p1, point p2, point p3,
                          double width0, double width1,
-                         uint32_t color, double opacity, int depth) {
-    if (cubic_outside(fb, p0, p1, p2, p3, width0, width1)) return;
+                         uint32_t color, double opacity, int depth,
+                         double dash_on, double dash_off, double *phase) {
+    /* Patterned curves must advance phase even when every chord is offscreen.
+     * Retain the convex-hull fast cull only for solid strokes. */
+    if (dash_on == 0.0 && dash_off == 0.0 &&
+        cubic_outside(fb, p0, p1, p2, p3, width0, width1)) return;
     double chord_length = hypot(p3.x - p0.x, p3.y - p0.y);
     double control_length = hypot(p1.x - p0.x, p1.y - p0.y) +
                             hypot(p2.x - p1.x, p2.y - p1.y) +
@@ -214,7 +374,8 @@ static void stroke_cubic(rough_framebuffer *fb,
     int accept_chord = isfinite(excess_length) && flatness <= CURVE_TOLERANCE &&
                        excess_length <= CURVE_TOLERANCE;
     if (depth >= CURVE_MAX_DEPTH || accept_chord) {
-        stroke_segment(fb, p0.x, p0.y, p3.x, p3.y, width0, width1, color, opacity);
+        stroke_segment(fb, p0.x, p0.y, p3.x, p3.y, width0, width1,
+                       color, opacity, dash_on, dash_off, phase);
         return;
     }
 
@@ -226,18 +387,18 @@ static void stroke_cubic(rough_framebuffer *fb,
     point center = midpoint(p012, p123);
     double middle_width = (width0 + width1) * 0.5;
     stroke_cubic(fb, p0, p01, p012, center, width0, middle_width,
-                 color, opacity, depth + 1);
+                 color, opacity, depth + 1, dash_on, dash_off, phase);
     stroke_cubic(fb, center, p123, p23, p3, middle_width, width1,
-                 color, opacity, depth + 1);
+                 color, opacity, depth + 1, dash_on, dash_off, phase);
 }
 
 int rough_render_stream(FILE *input, rough_framebuffer *fb) {
-    if (!input || !fb || !fb->pixels || !fb->width || !fb->height || fb->stride_pixels < fb->width ||
-        fb->width > 1000000 || fb->height > 1000000) return -1;
+    if (!input || !valid_target(fb)) return -1;
 
     uint32_t color = 0xff000000u;
     double opacity = 1.0;
     double width = 1.0;
+    double dash_on = 0.0, dash_off = 0.0, dash_phase = 0.0;
     double x = 0.0;
     double y = 0.0;
     int pen = 0;
@@ -249,8 +410,8 @@ int rough_render_stream(FILE *input, rough_framebuffer *fb) {
         if (line[length - 1] != '\n' && !feof(input)) return -2;
         if (line[0] == '#' || line[0] == '\n') continue;
 
-        double fields[7] = {0.0};
-        int count = parse_numbers(line + 1, fields, 7);
+        double fields[9] = {0.0};
+        int count = parse_numbers(line + 1, fields, 9);
         if (count < 0) return -2;
         switch (line[0]) {
         case 'P':
@@ -269,17 +430,27 @@ int rough_render_stream(FILE *input, rough_framebuffer *fb) {
             if (count != 1 || !valid_width(fields[0])) return -2;
             width = fields[0];
             break;
+        case 'D':
+            if (count != 2) return -2;
+            if (fields[0] != 0.0 || fields[1] != 0.0) {
+                if (fields[0] < 0.25 || fields[1] < 0.25 ||
+                    fields[0] > 1000000.0 || fields[1] > 1000000.0) return -2;
+            }
+            dash_on = fields[0]; dash_off = fields[1]; dash_phase = 0.0;
+            break;
         case 'M':
             if (count != 2) return -2;
             x = fields[0];
             y = fields[1];
+            dash_phase = 0.0;
             pen = 1;
             break;
         case 'L': {
             if (!pen || (count != 2 && count != 3)) return -2;
             double end_width = count == 3 ? fields[2] : width;
             if (!valid_width(end_width)) return -2;
-            stroke_segment(fb, x, y, fields[0], fields[1], width, end_width, color, opacity);
+            stroke_segment(fb, x, y, fields[0], fields[1], width, end_width,
+                           color, opacity, dash_on, dash_off, &dash_phase);
             x = fields[0];
             y = fields[1];
             width = end_width;
@@ -293,10 +464,19 @@ int rough_render_stream(FILE *input, rough_framebuffer *fb) {
             point p1 = {fields[0], fields[1]};
             point p2 = {fields[2], fields[3]};
             point p3 = {fields[4], fields[5]};
-            stroke_cubic(fb, p0, p1, p2, p3, width, end_width, color, opacity, 0);
+            stroke_cubic(fb, p0, p1, p2, p3, width, end_width,
+                         color, opacity, 0, dash_on, dash_off, &dash_phase);
             x = fields[4];
             y = fields[5];
             width = end_width;
+            break;
+        }
+        case 'T': {
+            if (count != 9) return -2;
+            rough_vertex vertex0 = {fields[0], fields[1], fields[2]};
+            rough_vertex vertex1 = {fields[3], fields[4], fields[5]};
+            rough_vertex vertex2 = {fields[6], fields[7], fields[8]};
+            if (rough_fill_triangle(fb, vertex0, vertex1, vertex2, color, opacity)) return -2;
             break;
         }
         default:

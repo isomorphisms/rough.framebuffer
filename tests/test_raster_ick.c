@@ -22,7 +22,7 @@ static void test_stream_and_pixel_values(void) {
     for (size_t i = 0; i < sizeof(pixels) / sizeof(pixels[0]); ++i)
         pixels[i] = 0xffffffffu;
 
-    rough_framebuffer frame = {pixels, 20, 10, 20};
+    rough_framebuffer frame = {pixels, 20, 10, 20, NULL, 0};
     assert(render("P 240 20 50\n"
                   "M 2 2\nL 18 2\n"
                   "M 2 4\nC 5 4 14 4 18 4\n"
@@ -44,7 +44,7 @@ static void test_refusals_and_clipping(void) {
     for (size_t i = 0; i < sizeof(pixels) / sizeof(pixels[0]); ++i)
         pixels[i] = 0xffffffffu;
 
-    rough_framebuffer frame = {pixels, 20, 10, 20};
+    rough_framebuffer frame = {pixels, 20, 10, 20, NULL, 0};
     assert(render("M 0 0 junk\n", &frame) != 0);
     assert(render("L 8 2\n", &frame) != 0);
     assert(render("M 1 2 3\n", &frame) != 0);
@@ -52,9 +52,9 @@ static void test_refusals_and_clipping(void) {
                   "L 100000000 100000000\n", &frame) == 0);
     assert(pixels[0] == 0xff000000u);
 
-    rough_framebuffer invalid_stride = {pixels, 20, 10, 19};
+    rough_framebuffer invalid_stride = {pixels, 20, 10, 19, NULL, 0};
     assert(render("M 0 0\nL 2 2\n", &invalid_stride) != 0);
-    rough_framebuffer invalid_pixels = {NULL, 20, 10, 20};
+    rough_framebuffer invalid_pixels = {NULL, 20, 10, 20, NULL, 0};
     assert(render("M 0 0\nL 2 2\n", &invalid_pixels) != 0);
     assert(rough_render_stream(NULL, &frame) != 0);
 }

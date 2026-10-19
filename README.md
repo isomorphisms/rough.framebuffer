@@ -4,17 +4,19 @@ A direct-framebuffer adaptation of [Rough.js](https://github.com/rough-stuff/rou
 
 This is intended to be a **Field Mouse translation of the drawing algorithms**, not
 an embedded copy of Rough.js and not a Canvas/SVG wrapper. Field Mouse emits
-geometry commands; a small C renderer writes them into a caller-owned 32-bit pixel
-buffer. The CLI writes PPM only as a portable inspection format, not as an
-intermediate rendering dependency.
+geometry commands; a small C renderer writes them into caller-owned color and
+optional depth buffers. The CLI writes PPM only as a portable inspection format,
+not as an intermediate rendering dependency.
 
 The geometry slice implements seeded, bowed double-stroke **lines, polylines,
-polygons and rectangles**. The native renderer now treats those operations as
+polygons and rectangles**. The native renderer treats those operations as
 continuous strokes rather than integer pixel walks: it provides coverage
 antialiasing, straight-alpha source-over composition, round caps, linearly tapered
-widths, and adaptive cubic subdivision. It does not yet implement ellipses, SVG
-paths, filled shapes, hachures, textured brushes, joins as an independently
-selectable style, triangles, or a depth buffer.
+widths, and adaptive cubic subdivision. It also fills flat-color screen-space
+triangles with barycentric depth interpolation and a half-open shared-edge rule.
+It does not yet implement ellipses, SVG paths, hachures, textured brushes, joins as
+an independently selectable style, antialiased triangle edges, perspective-correct
+attributes, a camera, or mesh clipping.
 
 ## Owned toolchains only
 
@@ -45,18 +47,26 @@ fieldmouse src/rough.fm fixtures/scene.json scene.ops
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
 not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build and native tests; it does not run Field Mouse or substitute Node for it.
 
-Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer. The legacy Field Mouse integration and Python numerical oracle remain separate, unqualified under Ithon; neither runs automatically and neither is counted toward this owned-toolchain qualification.
+Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer,
+including triangle edge ownership, winding, depth testing and interpolation. The
+continuous-stroke native API checks and both offscreen dash-phase source mutants
+are preserved under the same checked entrypoint. The legacy raster Python test
+remains an explicitly labelled CPython migration obligation and runs separately
+in CI; its success is not Ithon acceptance. Field Mouse integration remains a
+separate, unqualified end-to-end obligation.
 
-For a direct renderer example that does not require Field Mouse:
+Direct renderer examples that do not require Field Mouse:
 
 ```sh
 ./build/rough-fb fixtures/coverage.ops coverage.ppm 200 160
+./build/rough-fb fixtures/triangles.ops triangles.ppm 210 170
 ```
 
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
-`disableMultiStroke`, and `color` (an RGB triplet). Supported types: `line`,
-`rectangle`, `polyline`, `polygon`.
+`disableMultiStroke`, and `color` (an RGB triplet). Supported Field Mouse shape
+types remain `line`, `rectangle`, `polyline`, and `polygon`; triangle operations
+currently enter at the native stream or C API layer.
 
 ## Native Subpixel visual comparison (candidate)
 
@@ -71,8 +81,9 @@ sh scripts/run-ike.sh preview
 The retained `subpixel/build/curve-3x3-vs-5x5.ppm` filename now holds a 384×72 P6 comparison. The target also builds the versioned native path consumer and produces 32 font specimen panels with actual sample masks and count/coverage metrics. See [scope and limitations](subpixel/examples/README.md) and [the whole-path contract](subpixel/PATH.md). These are host CPU results; Android and 3D depth acceptance remain separate.
 ## Operation stream
 
-One command occupies one line. Coordinates and widths are floating-point values;
-colors remain integer RGB values. Defaults are black, opacity `1`, and width `1`.
+One command occupies one line. Coordinates, depths, and widths are floating-point
+values; colors remain integer RGB values. Defaults are black, opacity `1`, and
+width `1`.
 
 ```text
 P red green blue
@@ -81,16 +92,86 @@ W width
 M x y
 L x y [endWidth]
 C control1X control1Y control2X control2Y endX endY [endWidth]
+T x0 y0 depth0 x1 y1 depth1 x2 y2 depth2
 ```
 
 `A` accepts opacity from `0` through `1`. `W` requires a positive width. When the
 optional final width is present on `L` or `C`, width varies linearly across that
 operation and the final value becomes the current width for the next operation.
-Old `P/M/L/C` streams remain valid.
+`T` fills one triangle using the current color and opacity. It does not alter the
+current pen position or stroke width. Old `P/M/L/C` streams remain valid.
 
 Pixel centers use integer coordinates. A width-one horizontal stroke at `y = 2`
 therefore fully covers row 2, preserving the original stream-to-pixel convention;
-non-axis-aligned edges receive fractional coverage.
+non-axis-aligned stroke edges receive fractional coverage. Triangle interiors use
+pixel-center sampling and a top-left half-open rule, so two consistently specified
+faces sharing an edge neither crack nor double-own a sample.
+
+## Color and depth surfaces
+
+The public `rough_framebuffer` contains an allocated, straight-alpha `0xAARRGGBB`
+color surface with explicit width, height, and stride. Its optional `float` depth
+surface is also caller-owned and has its own stride. Smaller depth values are
+nearer; callers should clear the active depth region to `INFINITY` before a frame.
+If the depth pointer is `NULL`, triangles use submission order without depth
+testing. `rough_fill_triangle` exposes the same primitive directly without a text
+stream.
+
+Depth varies linearly in screen space across a triangle. A passing fragment writes
+depth and then blends its color. Partly translucent triangles therefore still
+occlude later geometry; order-independent transparency is outside this slice.
+Strokes do not currently read or write depth.
+
+The native caller can own an Android surface or a mapped framebuffer; the library
+itself does not open `/dev/fb0` and does not claim Android packaging or touch
+integration. The renderer allocates no internal image-sized storage.
+
+## ICK-only compilation for the dotted framebuffer candidate
+
+The user requires **ICK exclusively** for the Billiard consumer. On this branch
+the product Makefile no longer accepts default stock C compilation: it must
+receive an identified, source-built ICK compiler and the matching exact source
+checkout. The pinned GitHub workflow uses the owned `ick-host` action and
+rejects both missing and stock C compilers. ICK's executable name ends in
+`gcc` only because its compiler implementation is GCC-derived; verify the
+commit and owning `cc1`, not its filename.
+
+Any old GCC/Clang-created dot-stroke images remain historical and do not
+establish ICK-only acceptance. This branch supplies the required exact-head
+ICK output to `isomorphisms/billiard`.
+## Translucent dotted strokes (stacked on coverage-strokes)
+
+The `renderer/continuous-dots` candidate extends the reviewed `P/A/W/M/L/C`
+geometry stream with `D ON OFF` in framebuffer pixel units:
+
+```text
+P 48 130 165
+A 0.20
+W 1.1
+D 1 6
+M 10 20
+L 85 20
+L 85 105
+D 0 0
+```
+
+`D` repeats ON units painted, then OFF units unpainted. Each nonzero interval
+must be at least 0.25 and at most 1,000,000. `D 0 0` switches back to a solid
+stroke; any other zero/negative interval is rejected. Pattern phase is based on
+**the entire mathematical segment length**, including portions outside the
+viewport. Successive `L` segments and flattened `C` chords carry phase
+continuously across joints; `M` and `D` reset phase to zero.
+
+The painter's stroke may be rough, but mathematical collision geometry belongs
+to the consumer. Alpha and width remain independent of the dash pattern.
+The coverage and depth work from main is retained together with these patterned
+strokes. Native API fixtures check phase after a wholly clipped cubic and its
+following line, alpha blending, and unchanged depth. Two production mutants
+discard the clipped curve's phase or reset incoming segment phase; both must
+be rejected by that same native oracle. Every application and native-test C
+compile uses the pinned ICK frontend. The inherited Python raster harness is
+retained migration debt; its dot and triangle fixture sets are reconciled
+without adding Python behavior. Android-device acceptance remains separate.
 
 ## Pipeline
 
@@ -98,17 +179,11 @@ non-axis-aligned edges receive fractional coverage.
 JSON scene -> Field Mouse geometry -> operation stream
                                         |
                                         v
-                             native software pixel buffer
+                       native color buffer + optional depth
                                         |
                                         v
                               PPM (optional fixture)
 ```
-
-The renderer's public `rough_render_stream` API accepts an allocated, straight-alpha
-`0xAARRGGBB` pixel surface and explicit width, height, and stride. Its native caller
-can own an Android surface or a mapped framebuffer; the library itself does not
-open `/dev/fb0` and does not claim Android packaging or touch integration. The
-renderer allocates no internal image-sized storage.
 
 ## Provenance
 

@@ -18,7 +18,7 @@ static uint64_t hash(const void *data,size_t size) {
 }
 static int render(void) {
     for(unsigned i=0;i<PANELS;i++)for(size_t j=0;j<WORDS;j++)pixels[i][j]=0xffffffffu;
-    rough_framebuffer fb={pixels[0],WIDTH,HEIGHT,WIDTH};
+    rough_framebuffer fb={pixels[0],WIDTH,HEIGHT,WIDTH,NULL,0};
     FILE *legacy=tmpfile();if(!legacy)return 0;
     int ok=fputs("P 23 57 92\nA .7\nW 1.04\nM -8 66\nL 32 12\nM 8 62\nC 27 6 69 70 88 12\nM 88 12\nC 69 70 27 6 8 62\nM 28 58\nL 87 43\n",legacy)>=0;
     if(fflush(legacy))ok=0;

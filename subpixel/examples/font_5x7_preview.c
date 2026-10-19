@@ -205,7 +205,7 @@ static int run_case(FILE *metrics, FILE *sample_masks, double scale,
             clear_storage(width, height, inverse);
             cp_coverage_plane plane = {masks, MAX_WORDS, width + PAD,
                                        width, height, 0, 0};
-            rough_framebuffer target = {resolved, width, height, width + PAD};
+            rough_framebuffer target = {resolved, width, height, width + PAD, NULL, 0};
             cp_path_report report = {0};
             int status = 0;
             if (mode == 0) bitmap_masks(glyph, scale, origin, &plane);

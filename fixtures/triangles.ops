@@ -1,0 +1,10 @@
+# A far warm triangle, then a nearer sloped cool triangle.
+P 225 90 45
+T 20 20 0.8 180 35 0.8 70 145 0.8
+P 45 95 225
+T 35 35 0.2 165 50 0.9 90 130 0.2
+
+# A two-triangle square demonstrates the half-open shared-edge rule.
+P 35 35 45
+T 125 95 0.1 185 95 0.1 185 150 0.1
+T 125 95 0.1 185 150 0.1 125 150 0.1

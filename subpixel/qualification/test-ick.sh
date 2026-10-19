@@ -86,13 +86,15 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/src/main.c" -o "$out/rough_main.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/tests/test_raster_ick.c" -o "$out/test_raster_ick.o"
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/tests/test_api.c" -o "$out/test_api.o"
 
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
               "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" "$out/test_coverage_plane.o" \
               "$out/path.o" "$out/test_path.o" \
               "$out/font_5x7.o" "$out/test_font_5x7.o" "$out/font_5x7_dump.o" \
-              "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o"; do
+              "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o" "$out/test_api.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
     readelf -h "$object" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
@@ -114,6 +116,8 @@ done
     -lm -o "$out/font_5x7_dump"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/test_raster_ick.o" \
     -lm -o "$out/test_raster_ick"
+"$HOST_LINKER" "$out/framebuffer.o" "$out/test_api.o" \
+    -lm -o "$out/test_api"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/rough_main.o" \
     -lm -o "$repo_root/build/rough-fb"
 
@@ -141,4 +145,27 @@ sha256sum "$out/path.o" "$out/test_path.o" "$out/test_path" "$out/path.su"
 test -s "$out/font-5x7-subpixels.txt"
 sha256sum "$out/font-5x7-subpixels.txt"
 "$out/test_raster_ick"
+"$out/test_api"
+
+# Preserve both real source regressions from the integrated continuous-stroke
+# parent within the existing Ike-v1 POSIX recipe boundary. All mutated C is
+# still compiled by the authenticated ICK; the system driver links objects.
+sed 's/if (dash_on == 0.0 \&\& dash_off == 0.0 \&\&/if (/' \
+    "$repo_root/src/framebuffer.c" > "$out/framebuffer-cull-mutant.c"
+sed 's/double start_phase = \*phase;/double start_phase = 0.0;/' \
+    "$repo_root/src/framebuffer.c" > "$out/framebuffer-phase-mutant.c"
+ulimit -c 0
+for defect in cull phase; do
+    if cmp -s "$repo_root/src/framebuffer.c" "$out/framebuffer-$defect-mutant.c"; then
+        echo "Missing source mutation: $defect" >&2; exit 1
+    fi
+    "$ICK_CC" $flags -I"$repo_root/src" -c "$out/framebuffer-$defect-mutant.c" -o "$out/framebuffer-$defect-mutant.o"
+    "$HOST_LINKER" "$out/framebuffer-$defect-mutant.o" "$out/test_api.o" -lm -o "$out/reject-$defect"
+    if "$out/reject-$defect" > "$out/reject-$defect.log" 2>&1; then
+        echo "Accepted defective dash-phase source: $defect" >&2; exit 1
+    fi
+    grep -Fq 'patterned_stream' "$out/reject-$defect.log"
+done
+sha256sum "$out/test_api.o" "$out/test_api" "$out/framebuffer-cull-mutant.c" "$out/framebuffer-phase-mutant.c"
+echo "Native triangle API and both executed dash-phase source mutants: PASS"
 echo "ICK-compiled Subpixel 3x3 + 5x5 and framebuffer native C11 tests: PASS"
