@@ -18,25 +18,42 @@ It does not yet implement ellipses, SVG paths, hachures, textured brushes, joins
 an independently selectable style, antialiased triangle edges, perspective-correct
 attributes, a camera, or mesh clipping.
 
+## Owned toolchains only
+
+The **authoritative build orchestrator is [Ike](https://github.com/dilapidated-shed/ike)** with its checked `Ikefile` and `ike-build-v1` receipt. Consumer C code is compiled exclusively by pinned source-built **[ICK](https://github.com/dilapidated-shed/ick)**. ICKY remains the developing parser; Ithon/ILua and other owned tools must be used only at stages they actually support.
+
+GNU Make is explicitly blocked by the top-level and Subpixel `Makefile` stubs. There is no `CC=cc`, GCC, Clang, NDK or GNU Make product fallback. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands a pinned compiled Ike, caller-supplied expected executable digest (independent verification pending) and fresh receipt path. Refer to [owned-toolchain qualification](subpixel/qualification/README.md).
+
+**Explicit stage-zero exceptions:** Building the GCC-derived ICK compiler still requires the system host C/C++ bootstrap toolchain and GNU Make; a declared system linker supplies Linux CRT/libc/libm after ICK generated the project and Ike objects. None of these stages compiles any consumer C source. This is not yet a self-hosting complete-toolchain claim.
+
 ## Build and run
 
+A pinned, qualified Ike and ICK must both be supplied (the workflow builds them from source). Example from a qualified host:
+
 ```sh
-make
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
+HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
+IKE_BIN=/absolute/verified/ike \
+IKE_SOURCE_DIR=/absolute/pinned/ike/checkout \
+IKE_EXPECTED_SHA256="$PINNED_IKE_SHA256" \
+IKE_RECEIPT=/absolute/unused/receipt.tsv \
+sh scripts/run-ike.sh test
 fieldmouse src/rough.fm fixtures/scene.json scene.ops
 ./build/rough-fb scene.ops scene.ppm 240 200
 ```
 
 `fieldmouse` means the native Idriç-based interpreter from
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
-not Node and not a JavaScript transpiler. `make` builds only the C renderer; it
-does not secretly substitute Node if Field Mouse is unavailable.
+not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build and native tests; it does not run Field Mouse or substitute Node for it.
 
-`make test` verifies clipping, strict parsing, stroke coverage, alpha composition,
-tapered widths, adaptive cubic rasterization, triangle edge ownership, winding,
-depth testing, and interpolated depth. `FIELD_MOUSE=/path/to/fieldmouse make
-test-fieldmouse` exercises the actual Field Mouse executor, including repeated
-seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial
-geometry against pinned Rough.js math; it does not replace Field Mouse execution.
+Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer,
+including triangle edge ownership, winding, depth testing and interpolation. The
+continuous-stroke native API checks and both offscreen dash-phase source mutants
+are preserved under the same checked entrypoint. The legacy raster Python test
+remains an explicitly labelled CPython migration obligation and runs separately
+in CI; its success is not Ithon acceptance. Field Mouse integration remains a
+separate, unqualified end-to-end obligation.
 
 Direct renderer examples that do not require Field Mouse:
 
@@ -51,6 +68,17 @@ optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 types remain `line`, `rectangle`, `polyline`, and `polygon`; triangle operations
 currently enter at the native stream or C API layer.
 
+## Native Subpixel visual comparison (candidate)
+
+The ICK-built `subpixel/examples/preview.c` compares the historical continuous-stroke renderer, quadratic 3×3, cubic 5×5, and automatic whole-path selection in four 96×72 panels. The whole-path API adaptively partitions the source and checks the final masks against a fine polyline reference before committing coverage.
+
+From a host with the pinned source-built ICK and Ike environment configured above:
+
+```sh
+sh scripts/run-ike.sh preview
+```
+
+The retained `subpixel/build/curve-3x3-vs-5x5.ppm` filename now holds a 384×72 P6 comparison. The target also builds the versioned native path consumer and produces 32 font specimen panels with actual sample masks and count/coverage metrics. See [scope and limitations](subpixel/examples/README.md) and [the whole-path contract](subpixel/PATH.md). These are host CPU results; Android and 3D depth acceptance remain separate.
 ## Operation stream
 
 One command occupies one line. Coordinates, depths, and widths are floating-point
@@ -171,3 +199,13 @@ original source from archived [Processing.js v1.6.6](https://github.com/processi
 including its license and authors. It is read-only comparison material for drawing,
 transforms, shapes, parsing, and touch/mouse input, **not a build or runtime
 requirement** of the Field Mouse/C framebuffer pipeline.
+
+## Subpixel terminology
+
+Current product code, headers, paths, executables, diagnostics and workflows use **subpixel**.
+The original GitHub issues, PR titles, immutable commits and previously generated receipts
+retain their historical spelling; they are not executable interfaces. This migration
+is tracked in [SUN #120](https://github.com/isomorphisms/flexible-pipes/issues/120).
+The `test`/`preview` Ike recipes run the naming gate, which rejects tracked stale
+paths/text and attempts to compile two intentionally obsolete interface probes using
+pinned ICK. The native coverage and composition source mathematics are unchanged.
