@@ -1,0 +1,9 @@
+SUBPIXEL-PATH 1
+canvas 96 72 ffffffff
+# Oblique line, inflecting cubic, reversal, crossing and clipped viewport edge.
+shape 1 ff17395c 0.7 1.04
+line -8 66 32 12
+cubic 8 62 27 6 69 70 88 12
+cubic 88 12 69 70 27 6 8 62
+line 28 58 87 43
+end
