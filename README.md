@@ -98,6 +98,53 @@ The native caller can own an Android surface or a mapped framebuffer; the librar
 itself does not open `/dev/fb0` and does not claim Android packaging or touch
 integration. The renderer allocates no internal image-sized storage.
 
+## ICK-only compilation for the dotted framebuffer candidate
+
+The user requires **ICK exclusively** for the Billiard consumer. On this branch
+the product Makefile no longer accepts default stock C compilation: it must
+receive an identified, source-built ICK compiler and the matching exact source
+checkout. The pinned GitHub workflow uses the owned `ick-host` action and
+rejects both missing and stock C compilers. ICK's executable name ends in
+`gcc` only because its compiler implementation is GCC-derived; verify the
+commit and owning `cc1`, not its filename.
+
+Any old GCC/Clang-created dot-stroke images remain historical and do not
+establish ICK-only acceptance. This branch supplies the required exact-head
+ICK output to `isomorphisms/billiard`.
+## Translucent dotted strokes (stacked on coverage-strokes)
+
+The `renderer/continuous-dots` candidate extends the reviewed `P/A/W/M/L/C`
+geometry stream with `D ON OFF` in framebuffer pixel units:
+
+```text
+P 48 130 165
+A 0.20
+W 1.1
+D 1 6
+M 10 20
+L 85 20
+L 85 105
+D 0 0
+```
+
+`D` repeats ON units painted, then OFF units unpainted. Each nonzero interval
+must be at least 0.25 and at most 1,000,000. `D 0 0` switches back to a solid
+stroke; any other zero/negative interval is rejected. Pattern phase is based on
+**the entire mathematical segment length**, including portions outside the
+viewport. Successive `L` segments and flattened `C` chords carry phase
+continuously across joints; `M` and `D` reset phase to zero.
+
+The painter's stroke may be rough, but mathematical collision geometry belongs
+to the consumer. Alpha and width remain independent of the dash pattern.
+The coverage and depth work from main is retained together with these patterned
+strokes. Native API fixtures check phase after a wholly clipped cubic and its
+following line, alpha blending, and unchanged depth. Two production mutants
+discard the clipped curve's phase or reset incoming segment phase; both must
+be rejected by that same native oracle. Every application and native-test C
+compile uses the pinned ICK frontend. The inherited Python raster harness is
+retained migration debt; its dot and triangle fixture sets are reconciled
+without adding Python behavior. Android-device acceptance remains separate.
+
 ## Pipeline
 
 ```text
