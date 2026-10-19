@@ -4,13 +4,17 @@ A direct-framebuffer adaptation of [Rough.js](https://github.com/rough-stuff/rou
 
 This is intended to be a **Field Mouse translation of the drawing algorithms**, not
 an embedded copy of Rough.js and not a Canvas/SVG wrapper. Field Mouse emits
-geometry commands (`M`, `C`, `L`) plus pen colors (`P`); a small C renderer
-writes them into a caller-owned 32-bit pixel buffer. The CLI writes PPM only as
-a portable inspection format, not as an intermediate rendering dependency.
+geometry commands; a small C renderer writes them into a caller-owned 32-bit pixel
+buffer. The CLI writes PPM only as a portable inspection format, not as an
+intermediate rendering dependency.
 
-The first slice implements seeded, bowed double-stroke **lines, polylines,
-polygons and rectangles**. It does not yet implement ellipses, SVG paths,
-filled shapes, hachures, textured brushes, or stroke-width variation.
+The geometry slice implements seeded, bowed double-stroke **lines, polylines,
+polygons and rectangles**. The native renderer now treats those operations as
+continuous strokes rather than integer pixel walks: it provides coverage
+antialiasing, straight-alpha source-over composition, round caps, linearly tapered
+widths, and adaptive cubic subdivision. It does not yet implement ellipses, SVG
+paths, filled shapes, hachures, textured brushes, joins as an independently
+selectable style, triangles, or a depth buffer.
 
 ## Owned toolchains only
 
@@ -43,6 +47,12 @@ not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build an
 
 Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer. The legacy Field Mouse integration and Python numerical oracle remain separate, unqualified under Ithon; neither runs automatically and neither is counted toward this owned-toolchain qualification.
 
+For a direct renderer example that does not require Field Mouse:
+
+```sh
+./build/rough-fb fixtures/coverage.ops coverage.ppm 200 160
+```
+
 Scene format uses `seed` plus `shapes`; each shape has a `type` and coordinates,
 optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 `disableMultiStroke`, and `color` (an RGB triplet). Supported types: `line`,
@@ -50,7 +60,7 @@ optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 
 ## Native Subpixel visual comparison (candidate)
 
-The ICK-built `subpixel/examples/preview.c` consumes both local curvature APIs and accumulates real 8×8 subpixel occupancy into two side-by-side 96×72 panels. It draws a genuinely slanted cubic Bézier stroke rather than a horizontal synthetic line or copied bitmap.
+The ICK-built `subpixel/examples/preview.c` compares the historical continuous-stroke renderer, quadratic 3×3, cubic 5×5, and automatic whole-path selection in four 96×72 panels. The whole-path API adaptively partitions the source and checks the final masks against a fine polyline reference before committing coverage.
 
 From a host with the pinned source-built ICK and Ike environment configured above:
 
@@ -58,12 +68,34 @@ From a host with the pinned source-built ICK and Ike environment configured abov
 sh scripts/run-ike.sh preview
 ```
 
-The resulting `subpixel/build/curve-3x3-vs-5x5.ppm` is a P6 image of size 192×72. The example runs genuine slant, partial-coverage, duplicate-union, deterministic frame and PPM format tests, then records the image SHA-256. See [the example's scope and limitations](subpixel/examples/README.md). It is a **native CPU preview only**, not an Android APK or a claimed repair of 3D triangle aliasing on C67.
+The retained `subpixel/build/curve-3x3-vs-5x5.ppm` filename now holds a 384×72 P6 comparison. The target also builds the versioned native path consumer and produces 32 font specimen panels with actual sample masks and count/coverage metrics. See [scope and limitations](subpixel/examples/README.md) and [the whole-path contract](subpixel/PATH.md). These are host CPU results; Android and 3D depth acceptance remain separate.
+## Operation stream
+
+One command occupies one line. Coordinates and widths are floating-point values;
+colors remain integer RGB values. Defaults are black, opacity `1`, and width `1`.
+
+```text
+P red green blue
+A opacity
+W width
+M x y
+L x y [endWidth]
+C control1X control1Y control2X control2Y endX endY [endWidth]
+```
+
+`A` accepts opacity from `0` through `1`. `W` requires a positive width. When the
+optional final width is present on `L` or `C`, width varies linearly across that
+operation and the final value becomes the current width for the next operation.
+Old `P/M/L/C` streams remain valid.
+
+Pixel centers use integer coordinates. A width-one horizontal stroke at `y = 2`
+therefore fully covers row 2, preserving the original stream-to-pixel convention;
+non-axis-aligned edges receive fractional coverage.
 
 ## Pipeline
 
-```
-JSON scene -> Field Mouse geometry -> M/C/L/P operation stream
+```text
+JSON scene -> Field Mouse geometry -> operation stream
                                         |
                                         v
                              native software pixel buffer
@@ -72,10 +104,11 @@ JSON scene -> Field Mouse geometry -> M/C/L/P operation stream
                               PPM (optional fixture)
 ```
 
-The renderer's public `rough_render_stream` API accepts an allocated `uint32_t`
-pixel surface and explicit width, height, and stride. Its native caller can own
-an Android surface or a mapped framebuffer; the library itself does not open
-`/dev/fb0` and does not claim Android packaging or touch integration.
+The renderer's public `rough_render_stream` API accepts an allocated, straight-alpha
+`0xAARRGGBB` pixel surface and explicit width, height, and stride. Its native caller
+can own an Android surface or a mapped framebuffer; the library itself does not
+open `/dev/fb0` and does not claim Android packaging or touch integration. The
+renderer allocates no internal image-sized storage.
 
 ## Provenance
 
