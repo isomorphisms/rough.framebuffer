@@ -8,7 +8,7 @@ LDLIBS = -lm
 ICK_SOURCE_SHA = c61e448251744a2f40ad743ebef1a027bdcd2f9d
 ICK_REFERENCE_SHA = 6294f1d9e7536e5ffcde09d1528c918d63abfef5
 
-.PHONY: all test test-fieldmouse check-ick clean
+.PHONY: all test test-mutants test-fieldmouse check-ick clean
 all: build/rough-fb
 
 check-ick:
@@ -24,8 +24,30 @@ build/rough-fb: src/main.c src/framebuffer.c src/framebuffer.h check-ick
 	@mkdir -p build
 	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) src/main.c src/framebuffer.c -o $@ $(LDLIBS)
 
-test: build/rough-fb
+build/test-api: tests/test_api.c src/framebuffer.c src/framebuffer.h check-ick
+	@mkdir -p build
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc tests/test_api.c src/framebuffer.c -o $@ $(LDLIBS)
+
+test: build/rough-fb build/test-api
+	./build/test-api
 	python3 tests/test_raster.py build/rough-fb
+	$(MAKE) test-mutants
+
+# Compile the same native API oracle against known-bad production mutations.
+# Each executable must fail; a missing substitution makes this gate fail too.
+build/test-cull-mutant: tests/test_api.c src/framebuffer.c src/framebuffer.h check-ick
+	@mkdir -p build
+	sed 's/if (dash_on == 0.0 \&\& dash_off == 0.0 \&\&/if (/' src/framebuffer.c > build/framebuffer-cull-mutant.c
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc tests/test_api.c build/framebuffer-cull-mutant.c -o $@ $(LDLIBS)
+
+build/test-phase-mutant: tests/test_api.c src/framebuffer.c src/framebuffer.h check-ick
+	@mkdir -p build
+	sed 's/double start_phase = \*phase;/double start_phase = 0.0;/' src/framebuffer.c > build/framebuffer-phase-mutant.c
+	"$(ICK_CC)" $(ICK_LINK_FLAGS) $(ICK_CFLAGS) -Isrc tests/test_api.c build/framebuffer-phase-mutant.c -o $@ $(LDLIBS)
+
+test-mutants: build/test-cull-mutant build/test-phase-mutant
+	! ./build/test-cull-mutant
+	! ./build/test-phase-mutant
 
 test-fieldmouse: build/rough-fb
 	FIELD_MOUSE=$(FIELD_MOUSE) python3 tests/test_fieldmouse.py build/rough-fb
