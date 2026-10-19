@@ -103,9 +103,12 @@ int main(int argc,char **argv) {
     int valid=load(input);if(fclose(input))valid=0;
     if(!valid){fputs("Invalid or unsupported SUBPIXEL-PATH 1 geometry\n",stderr);return 1;}
     size_t words=(size_t)width*height;
+    if(argc==6&&shape_count>2000000/words){fputs("Full-mask output budget exceeded\n",stderr);return 1;}
     uint32_t *pixels=malloc(words*sizeof *pixels);
-    uint64_t *occupancy=calloc(words,sizeof *occupancy),*candidate=malloc(words*sizeof *candidate),*reference=malloc(words*sizeof *reference);
-    if(!pixels||!occupancy||!candidate||!reference){free(pixels);free(occupancy);free(candidate);free(reference);return 1;}
+    uint64_t *occupancy=baseline?NULL:calloc(words,sizeof *occupancy);
+    uint64_t *candidate=baseline?NULL:malloc(words*sizeof *candidate);
+    uint64_t *reference=baseline?NULL:malloc(words*sizeof *reference);
+    if(!pixels||(!baseline&&(!occupancy||!candidate||!reference))){free(pixels);free(occupancy);free(candidate);free(reference);return 1;}
     for(size_t i=0;i<words;i++)pixels[i]=background;
     rough_framebuffer frame={pixels,width,height,width};
     cp_coverage_plane plane={occupancy,words,width,width,height,0,0};
@@ -151,7 +154,7 @@ int main(int argc,char **argv) {
                 baseline?"historical-stream":r->selected==CP_PATH_CUBIC?"cubic-5x5":"quadratic-3x3",
                 baseline?"historical per-segment composition; work not instrumented":r->reason,r->patches,r->reference_segments,r->sample_tests,
                 r->attempts,r->worst_pixel_error,r->reference_flatness,elapsed[i],
-                (baseline?words*4:r->peak_bytes+words*12)+sizeof segments+sizeof shapes+sizeof reports+sizeof elapsed)>0;
+                (baseline?words*4+4096*20:r->peak_bytes+words*12)+sizeof segments+sizeof shapes+sizeof reports+sizeof elapsed)>0;
         }
         if(masks) {
             rewind(maskfile);char copy[4096];size_t n;

@@ -61,7 +61,8 @@ and `end`. Pixel centers are integer coordinates. The caller chooses the
 geometry-to-pixel transform before serialization. Output dimensions are capped
 at 512 per side, with 8192 total segments and 2048 shapes. Each shape is limited
 to 100,000 patches and 200 million charged tests; the scene is limited to one
-billion. The historical baseline keeps its own bounded subdivision implementation
+billion. Optional full-mask text is limited to two million shape/pixel words.
+The historical baseline keeps its own bounded subdivision implementation
 and reports uninstrumented work honestly. Native input rejects unsupported syntax.
 
 Conway owns parser, groups, orbit enumeration and vector geometry. Its versioned
