@@ -1,0 +1,12 @@
+# Adaptive tapered cubic.
+P 40 70 210
+W 1
+M 20 105
+C 45 15 155 15 180 105 9
+
+# Translucent line tapering in the opposite direction.
+P 220 45 55
+A 0.55
+W 14
+M 20 135
+L 180 135 2
