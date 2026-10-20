@@ -50,9 +50,8 @@ not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build an
 Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer,
 including triangle edge ownership, winding, depth testing and interpolation. The
 continuous-stroke native API checks and both offscreen dash-phase source mutants
-are preserved under the same checked entrypoint. The legacy raster Python test
-remains an explicitly labelled CPython migration obligation and runs separately
-in CI; its success is not Ithon acceptance. Field Mouse integration remains a
+are preserved under the same checked entrypoint. The complete raster fixture
+set runs separately through the accepted mandatory Ithon host frontend. Field Mouse integration remains a
 separate, unqualified end-to-end obligation.
 
 Direct renderer examples that do not require Field Mouse:
@@ -169,9 +168,10 @@ strokes. Native API fixtures check phase after a wholly clipped cubic and its
 following line, alpha blending, and unchanged depth. Two production mutants
 discard the clipped curve's phase or reset incoming segment phase; both must
 be rejected by that same native oracle. Every application and native-test C
-compile uses the pinned ICK frontend. The inherited Python raster harness is
-retained migration debt; its dot and triangle fixture sets are reconciled
-without adding Python behavior. Android-device acceptance remains separate.
+compile uses the pinned ICK frontend. The inherited raster harness is now
+checked Ithon, including its dot, clipping, depth and malformed-input fixtures.
+The unchanged Field Mouse Python harness remains separate migration debt.
+Android-device acceptance remains separate.
 
 ## Pipeline
 
