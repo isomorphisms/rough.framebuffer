@@ -15,7 +15,7 @@ on:
       - 'src/main.c'
       - 'tests/test_raster_ick.c'
       - 'tests/test_api.c'
-      - 'tests/test_raster.py'
+      - 'tests/test_raster.pi'
       - '.github/workflows/subpixel-3x3.yml'
   push:
     branches:
@@ -36,7 +36,7 @@ on:
       - 'src/main.c'
       - 'tests/test_raster_ick.c'
       - 'tests/test_api.c'
-      - 'tests/test_raster.py'
+      - 'tests/test_raster.pi'
       - '.github/workflows/subpixel-3x3.yml'
 
 permissions:
@@ -226,8 +226,26 @@ jobs:
           sha256sum subpixel/build/curve-3x3-vs-5x5.ppm
           cat "$IKE_RECEIPT"
 
-      - name: Retain the existing raster oracle as explicit CPython migration debt
-        run: python3 tests/test_raster.py build/rough-fb
+      - name: Check out the accepted mandatory Ithon host frontend
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: dilapidated-shed/ithon
+          ref: 9d530f4ad51f5b0a09c3e74dbe45cac5bb6d52d3
+          path: .ithon
+
+      - name: Execute every inherited raster fixture through checked Ithon
+        env:
+          ITHON_PYTHON: python3
+          ITHON_CHECK_RECEIPT: ${{ runner.temp }}/raster-source-checks.ndjson
+        run: .ithon/ithon tests/test_raster.pi build/rough-fb
+
+      - name: Retain mandatory raster source-check receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: checked-raster-source-receipt
+          path: ${{ runner.temp }}/raster-source-checks.ndjson
+          if-no-files-found: error
 
       - name: Retain exact ICK-generated PPM for inspection
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
