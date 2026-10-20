@@ -236,7 +236,7 @@ jobs:
       - name: Execute every inherited raster fixture through checked Ithon
         env:
           ITHON_PYTHON: python3
-          ITHON_CHECK_LOG: ${{ runner.temp }}/raster-source-checks.ndjson
+          ITHON_CHECK_RECEIPT: ${{ runner.temp }}/raster-source-checks.ndjson
         run: .ithon/ithon tests/test_raster.pi build/rough-fb
 
       - name: Retain mandatory raster source-check receipt
