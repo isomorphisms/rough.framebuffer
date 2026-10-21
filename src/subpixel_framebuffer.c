@@ -10,8 +10,8 @@ static unsigned occupied_samples(uint64_t mask) {
     return count;
 }
 
-static unsigned rounded_byte(double unit_value) {
-    return (unsigned)floor(unit_value * 255.0 + 0.5);
+static unsigned rounded_byte(long double byte_value) {
+    return (unsigned)floorl(byte_value + 0.5L);
 }
 
 int rough_blend_subpixel_coverage(rough_framebuffer *target,
@@ -27,8 +27,11 @@ int rough_blend_subpixel_coverage(rough_framebuffer *target,
         return -1;
     if (last_row * target->stride_pixels + last_column >=
         SIZE_MAX / sizeof(uint32_t)) return -1;
-    double source_base_alpha = ((color >> 24) & 255u) / 255.0 * opacity;
-    if (source_base_alpha == 0.0) return 0;
+    /* Keep byte alpha and the 64-sample denominator explicit. Normalizing
+     * through /255 and multiplying back can move an exact half-byte below
+     * its rounding boundary (e.g. alpha 64, 33 samples, opacity 1/2). */
+    long double source_base_units = ((color >> 24) & 255u) * (long double)opacity;
+    if (source_base_units == 0.0L) return 0;
     for (unsigned row = 0; row < coverage->height; ++row) {
         int64_t pixel_y = (int64_t)coverage->origin_y + row;
         if (pixel_y < 0 || pixel_y >= target->height) continue;
@@ -37,19 +40,20 @@ int rough_blend_subpixel_coverage(rough_framebuffer *target,
             if (pixel_x < 0 || pixel_x >= target->width) continue;
             uint64_t mask = coverage->occupied[(size_t)row *
                 coverage->stride_words + column];
-            double source_alpha = source_base_alpha * occupied_samples(mask) / 64.0;
-            if (source_alpha == 0.0) continue;
+            long double source_units = source_base_units * occupied_samples(mask);
+            if (source_units == 0.0L) continue;
             size_t index = (size_t)pixel_y * target->stride_pixels + (size_t)pixel_x;
             uint32_t destination = target->pixels[index];
-            double destination_gain = ((destination >> 24) & 255u) / 255.0 *
-                (1.0 - source_alpha);
-            double output_alpha = source_alpha + destination_gain;
-            uint32_t output = (uint32_t)(rounded_byte(output_alpha) << 24);
+            long double source_weight = 255.0L * source_units;
+            long double destination_weight = ((destination >> 24) & 255u) *
+                (255.0L * 64.0L - source_units);
+            long double total_weight = source_weight + destination_weight;
+            uint32_t output = (uint32_t)(rounded_byte(total_weight / (255.0L * 64.0L)) << 24);
             for (unsigned shift = 0; shift < 24; shift += 8) {
-                double source = ((color >> shift) & 255u) / 255.0;
-                double background = ((destination >> shift) & 255u) / 255.0;
-                double component = (source * source_alpha +
-                    background * destination_gain) / output_alpha;
+                unsigned source = (color >> shift) & 255u;
+                unsigned background = (destination >> shift) & 255u;
+                long double component = (source * source_weight +
+                    background * destination_weight) / total_weight;
                 output |= (uint32_t)(rounded_byte(component) << shift);
             }
             target->pixels[index] = output;
