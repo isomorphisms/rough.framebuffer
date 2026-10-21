@@ -16,31 +16,43 @@ widths, and adaptive cubic subdivision. It also fills flat-color screen-space
 triangles with barycentric depth interpolation and a half-open shared-edge rule.
 It does not yet implement ellipses, SVG paths, hachures, textured brushes, joins as
 an independently selectable style, antialiased triangle edges, perspective-correct
-attributes, a general camera API, or arbitrary mesh clipping. The separate native
-surface generator provides fixed-camera projection and near clipping for two
-specific mathematical meshes.
+attributes, a camera, or mesh clipping.
+
+## Owned toolchains only
+
+The **authoritative build orchestrator is [Ike](https://github.com/dilapidated-shed/ike)** with its checked `Ikefile` and `ike-build-v1` receipt. Consumer C code is compiled exclusively by pinned source-built **[ICK](https://github.com/dilapidated-shed/ick)**. ICKY remains the developing parser; Ithon/ILua and other owned tools must be used only at stages they actually support.
+
+GNU Make is explicitly blocked by the top-level and Subpixel `Makefile` stubs. There is no `CC=cc`, GCC, Clang, NDK or GNU Make product fallback. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands a pinned compiled Ike, caller-supplied expected executable digest (independent verification pending) and fresh receipt path. Refer to [owned-toolchain qualification](subpixel/qualification/README.md).
+
+**Explicit stage-zero exceptions:** Building the GCC-derived ICK compiler still requires the system host C/C++ bootstrap toolchain and GNU Make; a declared system linker supplies Linux CRT/libc/libm after ICK generated the project and Ike objects. None of these stages compiles any consumer C source. This is not yet a self-hosting complete-toolchain claim.
 
 ## Build and run
 
+A pinned, qualified Ike and ICK must both be supplied (the workflow builds them from source). Example from a qualified host:
+
 ```sh
-make
+ICK_CC=/absolute/ick/stage/bin/x86_64-linux-gnu-gcc \
+ICK_SOURCE_DIR=/absolute/pinned/ick/checkout \
+HOST_LINKER=/usr/bin/x86_64-linux-gnu-gcc \
+IKE_BIN=/absolute/verified/ike \
+IKE_SOURCE_DIR=/absolute/pinned/ike/checkout \
+IKE_EXPECTED_SHA256="$PINNED_IKE_SHA256" \
+IKE_RECEIPT=/absolute/unused/receipt.tsv \
+sh scripts/run-ike.sh test
 fieldmouse src/rough.fm fixtures/scene.json scene.ops
 ./build/rough-fb scene.ops scene.ppm 240 200
 ```
 
 `fieldmouse` means the native Idriç-based interpreter from
 [dilapidated-shed/fieldmouse](https://github.com/dilapidated-shed/fieldmouse),
-not Node and not a JavaScript transpiler. `make` builds the C renderer and
-an independent native mathematical surface stream generator; it does not
-secretly substitute Node if Field Mouse is unavailable.
+not Node and not a JavaScript transpiler. Ike invokes the checked ICK C build and native tests; it does not run Field Mouse or substitute Node for it.
 
-`make test` verifies clipping, strict parsing, stroke coverage, alpha composition,
-tapered widths, adaptive cubic rasterization, triangle edge ownership, winding,
-depth testing, and interpolated depth, plus source-to-renderer mathematical
-surface frames and near-plane clipping. `FIELD_MOUSE=/path/to/fieldmouse make
-test-fieldmouse` exercises the actual Field Mouse executor, including repeated
-seeded output. The Python numeric oracle in `test-fieldmouse` checks the initial
-geometry against pinned Rough.js math; it does not replace Field Mouse execution.
+Ike's `test` target executes ICK-compiled C tests for Subpixel and the framebuffer,
+including triangle edge ownership, winding, depth testing and interpolation. The
+continuous-stroke native API checks and both offscreen dash-phase source mutants
+are preserved under the same checked entrypoint. The complete raster fixture
+set runs separately through the accepted mandatory Ithon host frontend. Field Mouse integration remains a
+separate, unqualified end-to-end obligation.
 
 Direct renderer examples that do not require Field Mouse:
 
@@ -55,31 +67,17 @@ optional `roughness`, `bowing`, `maxRandomnessOffset`, `preserveVertices`,
 types remain `line`, `rectangle`, `polyline`, and `polygon`; triangle operations
 currently enter at the native stream or C API layer.
 
-## Rotating mathematical surfaces
+## Native Subpixel visual comparison (candidate)
 
-The native scene generator emits shaded triangles into the same P/T operation
-stream accepted by the existing depth-tested renderer. It supports a torus and
-Enneper's minimal surface with controllable rotation, fixed-camera projection,
-near-plane clipping, and two-sided diffuse/ambient face shading:
+The ICK-built `subpixel/examples/preview.c` compares the historical continuous-stroke renderer, quadratic 3×3, cubic 5×5, and automatic whole-path selection in four 96×72 panels. The whole-path API adaptively partitions the source and checks the final masks against a fine polyline reference before committing coverage.
+
+From a host with the pinned source-built ICK and Ike environment configured above:
 
 ```sh
-./build/rough-surface enneper 25 320 240 > build/enneper.ops
-./build/rough-fb build/enneper.ops build/enneper.ppm 320 240
-./build/rough-surface torus 60 320 240 > build/torus.ops
-./build/rough-fb build/torus.ops build/torus.ppm 320 240
+sh scripts/run-ike.sh preview
 ```
 
-A [real 24-frame two-surface rotation movie](fixtures/previews/math-surfaces-rotation.mp4)
-is generated from the native renderer's PPM frames and encoded **off-device**
-as H.264, 320×160, 12 frames/second, no audio. Each half receives its own
-moving surface. The video packaging and finished-file decoder are separate
-from the C rasterization implementation; the [film acceptance contract](fixtures/movie.contract.tsv)
-requires full decoding and actual changed pixels in both panels.
-
-This produces headless inspectable PPM frames, **not** an Android APK,
-interactive animation, or a new Field Mouse frontend. See
-[the projection, shading, input, and acceptance contract](docs/surfaces.md).
-
+The retained `subpixel/build/curve-3x3-vs-5x5.ppm` filename now holds a 384×72 P6 comparison. The target also builds the versioned native path consumer and produces 32 font specimen panels with actual sample masks and count/coverage metrics. See [scope and limitations](subpixel/examples/README.md) and [the whole-path contract](subpixel/PATH.md). These are host CPU results; Android and 3D depth acceptance remain separate.
 ## Operation stream
 
 One command occupies one line. Coordinates, depths, and widths are floating-point
@@ -127,6 +125,54 @@ The native caller can own an Android surface or a mapped framebuffer; the librar
 itself does not open `/dev/fb0` and does not claim Android packaging or touch
 integration. The renderer allocates no internal image-sized storage.
 
+## ICK-only compilation for the dotted framebuffer candidate
+
+The user requires **ICK exclusively** for the Billiard consumer. On this branch
+the product Makefile no longer accepts default stock C compilation: it must
+receive an identified, source-built ICK compiler and the matching exact source
+checkout. The pinned GitHub workflow uses the owned `ick-host` action and
+rejects both missing and stock C compilers. ICK's executable name ends in
+`gcc` only because its compiler implementation is GCC-derived; verify the
+commit and owning `cc1`, not its filename.
+
+Any old GCC/Clang-created dot-stroke images remain historical and do not
+establish ICK-only acceptance. This branch supplies the required exact-head
+ICK output to `isomorphisms/billiard`.
+## Translucent dotted strokes (stacked on coverage-strokes)
+
+The `renderer/continuous-dots` candidate extends the reviewed `P/A/W/M/L/C`
+geometry stream with `D ON OFF` in framebuffer pixel units:
+
+```text
+P 48 130 165
+A 0.20
+W 1.1
+D 1 6
+M 10 20
+L 85 20
+L 85 105
+D 0 0
+```
+
+`D` repeats ON units painted, then OFF units unpainted. Each nonzero interval
+must be at least 0.25 and at most 1,000,000. `D 0 0` switches back to a solid
+stroke; any other zero/negative interval is rejected. Pattern phase is based on
+**the entire mathematical segment length**, including portions outside the
+viewport. Successive `L` segments and flattened `C` chords carry phase
+continuously across joints; `M` and `D` reset phase to zero.
+
+The painter's stroke may be rough, but mathematical collision geometry belongs
+to the consumer. Alpha and width remain independent of the dash pattern.
+The coverage and depth work from main is retained together with these patterned
+strokes. Native API fixtures check phase after a wholly clipped cubic and its
+following line, alpha blending, and unchanged depth. Two production mutants
+discard the clipped curve's phase or reset incoming segment phase; both must
+be rejected by that same native oracle. Every application and native-test C
+compile uses the pinned ICK frontend. The inherited raster harness is now
+checked Ithon, including its dot, clipping, depth and malformed-input fixtures.
+The unchanged Field Mouse Python harness remains separate migration debt.
+Android-device acceptance remains separate.
+
 ## Pipeline
 
 ```text
@@ -153,3 +199,43 @@ original source from archived [Processing.js v1.6.6](https://github.com/processi
 including its license and authors. It is read-only comparison material for drawing,
 transforms, shapes, parsing, and touch/mouse input, **not a build or runtime
 requirement** of the Field Mouse/C framebuffer pipeline.
+
+## Subpixel terminology
+
+Current product code, headers, paths, executables, diagnostics and workflows use **subpixel**.
+The original GitHub issues, PR titles, immutable commits and previously generated receipts
+retain their historical spelling; they are not executable interfaces. This migration
+is tracked in [SUN #120](https://github.com/isomorphisms/flexible-pipes/issues/120).
+The `test`/`preview` Ike recipes run the naming gate, which rejects tracked stale
+paths/text and attempts to compile two intentionally obsolete interface probes using
+pinned ICK. The native coverage and composition source mathematics are unchanged.
+
+## Headless mathematical surface source
+
+The preserved torus/Enneper P/T generator and its real framebuffer-pixel
+tests run under the same pinned ICK/Ike test route. This is a source stage,
+not an alternative rasterizer or an Android build. See
+[the surface integration contract](docs/surfaces.md). Fulton in
+`walnut-burgundy` remains upstream for algebraic curves, intersections
+and mathematical composition.
+
+## Native display preparation (source qualification)
+
+The original Android art draft's gesture reducer, direct geometry-to-framebuffer
+path, and straight-alpha RGBA8888 software presenter are preserved and
+independently exercised as native C via pinned ICK/Ike. The old GNU Make
+and ad-hoc GCC/Clang build routes have **not** been reintroduced.
+
+The historical NativeActivity source and manifest are retained as unqualified
+Android consumers. Actual A1/C67 packaging remains with the maintained
+android-NDK, Kitchen and Cat Food boundaries; current source admission does not
+claim a new APK, real device run or signer acceptance. See
+[Android source scope](android/README.md).
+
+## Depth-aware 2×2 antialiasing source
+
+The retained native `rough_draw_surface_aa2` independently tests color and
+depth at four samples per software pixel before resolving in premultiplied
+alpha, with caller-owned scratch. Its ICK/Ike native tests reject the original
+single-center-sample approximation. Android frame timing, physical screen
+quality and smooth normals remain separate qualifications.
