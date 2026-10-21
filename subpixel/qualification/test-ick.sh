@@ -145,7 +145,8 @@ done
     -lm -o "$out/test_api"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/rough_main.o" \
     -lm -o "$repo_root/build/rough-fb"
-"$HOST_LINKER" "$out/surface.o" "$out/surface_main.o" -lm \
+"$HOST_LINKER" "$out/surface.o" "$out/surface_main.o" \
+    "$out/framebuffer.o" -lm \
     -o "$repo_root/build/rough-surface"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/surface.o" "$out/test_surface.o" -lm \
     -o "$out/test_surface"
