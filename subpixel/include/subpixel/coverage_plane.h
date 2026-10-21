@@ -29,4 +29,24 @@ cp_status cp_coverage_plane_accumulate_3x3(cp_coverage_plane *plane,
 cp_status cp_coverage_plane_accumulate_5x5(cp_coverage_plane *plane,
     const cp_curve_patch *patch, int center_x, int center_y);
 
+/* Boolean algebra on the actual 64 midpoint samples, never on rounded
+ * pixel coverage fractions. The destination is the output domain; absent
+ * source pixels count as the empty mask. Both planes may have independent
+ * origins, extents and padded strides. Only active destination words change;
+ * source pixels and all row padding remain unchanged.
+ *
+ * Preflight checks BOTH layouts, the operation and overlapping backing
+ * storage before writing anything. Even self-aliasing is refused, matching
+ * whole-path scratch isolation. No allocation and no depth/alpha operations.
+ * Combine masks for one logical shape before one source-over resolve. */
+typedef enum {
+    CP_MASK_UNION,
+    CP_MASK_INTERSECTION,
+    CP_MASK_DIFFERENCE,
+    CP_MASK_SYMMETRIC_DIFFERENCE
+} cp_mask_operation;
+
+cp_status cp_coverage_plane_combine(cp_coverage_plane *destination,
+    const cp_coverage_plane *source, cp_mask_operation operation);
+
 #endif
