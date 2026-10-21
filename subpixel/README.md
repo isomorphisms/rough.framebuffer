@@ -1,5 +1,34 @@
 # Subpixel: local 3×3 and 5×5 curvature neighborhoods
 
+## Reusable occupancy plane and framebuffer boundary
+
+`subpixel/coverage_plane.h` exposes bounded caller-owned occupancy storage.
+The 3×3/5×5 integration functions evaluate the actual neighborhood, clip its
+global coordinates against the destination plane, and OR individual sample
+masks. Failed layout or patch checks leave occupancy unchanged. Row padding,
+negative origins and capacity arithmetic are checked. Callers clear storage
+explicitly and keep different colored shapes in separate planes.
+
+`src/subpixel_framebuffer.h` is the separate rendering boundary. It resolves
+coverage once and source-over blends into the actual `rough_framebuffer`,
+using the documented straight-alpha byte-channel convention. Color alpha,
+opacity and sample coverage are independent factors. It owns no allocation,
+does not mutate occupancy, and does not read or write depth. Buffers must not
+overlap. It does not promise gamma conversion or depth-aware strokes.
+
+The native preview now uses both boundaries instead of owning private
+neighborhood-merging and grayscale-rendering implementations. This is a real
+framebuffer consumer, while the legacy P/M/L/C kernel is still separate.
+It does not silently change stroke caps, taper semantics or transparency
+grouping. Curve sampling plans remain explicit: a local patch is not a
+complete global stroke, and sample-mask idempotence is not a proof of exact
+curve-subdivision invariance.
+
+The new code uses the established C11 library boundary and compiles through
+ICK under the existing pinned Ike recipes. The POSIX entrypoints are retained
+because their literal commands and `posix-system` runner are part of the
+already qualified receipt interface; no new shell helper is introduced.
+
 An independent C11 curve-neighborhood library underneath the
 `rough.framebuffer` workspace. It computes local curve geometry and
 fractional grayscale pixel coverage with no framebuffer, Android, Field Mouse,
@@ -69,39 +98,17 @@ coverage. Use a separate accumulator per shape/color; blending distinct
 shapes is out of scope. Input validation, arithmetic overflow and mutation
 of outputs/accumulators on failure are handled transactionally.
 
-## Build and verification: ICK is required
+## Build and verification: pinned Ike orchestrating pinned ICK
 
-The maintained **ICK C compiler** is the intended production compiler.
-The `make test-subpixel` route does *not* fall back to GCC or Clang.
-See `qualification/README.md` for the exact pinned source, source-built
-x86_64 driver, verified `cc1`, explicit object linker, ELF/hash receipts
-and further Android qualification requirements.
+The 3×3 and 5×5 libraries are compiled and tested with **source-built ICK**, orchestrated by pinned **Ike**, through the same `Ikefile`. The root and Subpixel GNU Makefiles deliberately refuse product builds; the old reference-only GCC/Clang jobs are historical diagnostics, not a selectable build.
 
-After building that exact ICK toolchain, supply `ICK_CC`,
-`ICK_SOURCE_DIR` and `HOST_LINKER` and run:
+From the repository root, with checked `ICK_CC`, `ICK_SOURCE_DIR`, `HOST_LINKER`, `IKE_BIN`, `IKE_SOURCE_DIR`, `IKE_EXPECTED_SHA256`, and a fresh `IKE_RECEIPT`:
 
-    make test-subpixel
+    sh scripts/run-ike.sh test
 
-All four C11 translation units (both curve implementations and both
-test suites) are compiled as ICK objects, then linked and executed.
+The execution compiles both curve implementations, both independent test suites, and framebuffer renderer/CLI/smoke using ICK; runs all three native test executables; checks x86_64 ELF object identities; and emits `ike-build-v1` and artifact hashes. See [the exact qualification contract](qualification/README.md). Ike itself is built by ICK in the hosted workflow.
 
-Separate, **reference-only** GCC and Clang checks:
-
-    make test-subpixel-reference CC=gcc
-    make test-subpixel-reference CC=clang
-    make -C subpixel clean
-    make test-subpixel-reference CC=clang CFLAGS='-O1 -g -std=c11 -Wall -Wextra -Werror -pedantic -fsanitize=address,undefined -fno-omit-frame-pointer'
-
-The original 3×3 tests remain mandatory. The 5×5 suite checks a separate
-**integer-rational oracle** for the asymmetric graph
-`v=u²/4+u³/16`, cubic Bézier derivatives, nonlinear parameter changes,
-reverse orientation, translation and pixel ordering, straight/vertical
-lines, duplicate/split union, out-of-domain, malformed input, overflow
-and no partial outputs. Reference tests cannot substitute for ICK.
-
-ICKY is not yet the integrated full C parser. x86_64 ICK qualification
-does not itself establish ARM32/AArch64 or C67 runtime integration, and
-neither compiler's test run substitutes for independent ai-ci acceptance.
+Tests cover the 3×3 quadratic and 5×5 cubic coefficient/coverage oracles, reparameterization, reversal, accumulation, malformed inputs and transactional error behavior. They do not prove C67/A1 Android source compilation, production rendering integration or device performance.
 
 ## Not claimed
 

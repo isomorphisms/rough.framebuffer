@@ -1,0 +1,147 @@
+"""Native stroke, triangle, depth, clipping and parser fixtures through Ithon."""
+from pathlib import Path
+from subprocess import run
+from tempfile import TemporaryDirectory
+from builtins import AssertionError
+import sys
+
+root ∈ object ← Path(__file__).resolve().parent.parent
+arguments ∈ list[str] ← sys.argv
+
+def require(condition ∈ bool, message ∈ str) → None:
+    if not condition:
+        raise AssertionError(message)
+
+def status(result ∈ object) → int:
+    code ∈ int ← result.returncode
+    return code
+
+def pixels_from(path ∈ object, width ∈ int, height ∈ int) → bytes:
+    blob ∈ bytes ← path.read_bytes()
+    header ∈ bytes ← ("P6\n" + str(width) + " " + str(height) + "\n255\n").encode()
+    valid_header ∈ bool ← blob.startswith(header)
+    require(valid_header, "renderer PPM header differs")
+    pixels ∈ bytes ← blob[len(header):]
+    require(len(pixels) == width * height * 3, "renderer pixel byte count differs")
+    return pixels
+
+def pixel(pixels ∈ bytes, width ∈ int, x ∈ int, y ∈ int) → bytes:
+    start ∈ int ← (y * width + x) * 3
+    result ∈ bytes ← pixels[start:start + 3]
+    return result
+
+def pixel_hex(pixels ∈ bytes, width ∈ int, x ∈ int, y ∈ int) → str:
+    value ∈ bytes ← pixel(pixels, width, x, y)
+    encoded ∈ str ← value.hex()
+    return encoded
+
+require(len(arguments) == 2, "requires the actual native renderer executable")
+exe ∈ str ← str(Path(arguments[1]).resolve())
+
+with TemporaryDirectory() as directory:
+    temporary ∈ object ← Path(directory)
+    output ∈ object ← temporary.joinpath("sample.ppm")
+    result ∈ object ← run([exe, str(root.joinpath("fixtures", "straight.ops")),
+        str(output), "20", "10"], capture_output=True, check=True)
+    require(status(result) == 0, "straight fixture returned failure")
+    pixels ∈ bytes ← pixels_from(output, 20, 10)
+    require(pixel_hex(pixels, 20, 2, 2) == "f01432", "straight start color")
+    require(pixel_hex(pixels, 20, 10, 2) == "f01432", "straight middle color")
+    require(pixel_hex(pixels, 20, 10, 4) == "f01432", "cubic straight color")
+    require(pixel_hex(pixels, 20, 10, 8) == "ffffff", "outside geometry changed")
+    malformed_result ∈ object ← run([exe, str(root.joinpath("fixtures", "malformed.ops")),
+        str(output), "20", "10"], capture_output=True)
+    require(status(malformed_result) != 0, "malformed fixture accepted")
+
+    # Out-of-bounds travel remains clipped before pixel-sized traversal.
+    operations ∈ object ← temporary.joinpath("case.ops")
+    operations.write_text("M -100000000 -100000000\nL 100000000 100000000\n")
+    run([exe, str(operations), str(output), "20", "10"], check=True, timeout=5)
+    pixels = pixels_from(output, 20, 10)
+    require(pixel_hex(pixels, 20, 0, 0) == "000000", "long clipped line lost origin")
+
+    # A diagonal retains fractional edge coverage.
+    operations.write_text("P 0 0 0\nW 1\nM 2 2\nL 15 8\n")
+    run([exe, str(operations), str(output), "20", "12"], check=True)
+    pixels = pixels_from(output, 20, 12)
+    grey ∈ bytes ← pixel(pixels, 20, 3, 3)
+    grey0 ∈ int ← grey[0]
+    grey1 ∈ int ← grey[1]
+    grey2 ∈ int ← grey[2]
+    require(0 < grey0 < 255 and grey0 == grey1 == grey2, "diagonal fractional grey coverage")
+
+    # End width tapers the segment and becomes the next width; alpha is separate.
+    operations.write_text("P 0 0 0\nW 1\nM 2 2\nL 17 2 5\nA 0.5\nM 2 8\nL 17 8\n")
+    run([exe, str(operations), str(output), "20", "12"], check=True)
+    pixels = pixels_from(output, 20, 12)
+    require(pixel_hex(pixels, 20, 2, 4) == "ffffff", "narrow taper changed")
+    require(pixel_hex(pixels, 20, 17, 4) == "000000", "wide taper changed")
+    require(pixel_hex(pixels, 20, 10, 8) == "808080", "alpha blending changed")
+
+    # Cubic subdivision follows the curve rather than its endpoint chord.
+    operations.write_text("P 0 0 0\nW 1\nM 2 9\nC 2 1 17 1 17 9\n")
+    run([exe, str(operations), str(output), "20", "12"], check=True)
+    pixels = pixels_from(output, 20, 12)
+    require(pixel_hex(pixels, 20, 10, 3) != "ffffff", "cubic curve was lost")
+    require(pixel_hex(pixels, 20, 10, 8) == "ffffff", "cubic became endpoint chord")
+    operations.write_text("P 0 0 0\nW 1\nM 10 5\nC 18 5 2 5 10 5\n")
+    run([exe, str(operations), str(output), "20", "12"], check=True)
+    pixels = pixels_from(output, 20, 12)
+    require(pixel_hex(pixels, 20, 12, 5) != "ffffff", "forward collinear reversal lost")
+    require(pixel_hex(pixels, 20, 8, 5) != "ffffff", "backward collinear reversal lost")
+
+    # Dotted phase crosses joints and resets only at explicit moves.
+    operations.write_text("P 0 0 0\nA 0.5\nW 1\nD 2 6\nM 2 2\nL 16 2\nL 16 18\nM 2 25\nL 18 25\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True)
+    pixels = pixels_from(output, 30, 30)
+    require(pixel_hex(pixels, 30, 3, 2) == "808080", "first translucent dash")
+    require(pixel_hex(pixels, 30, 7, 2) == "ffffff", "first dash gap")
+    require(pixel_hex(pixels, 30, 11, 2) == "808080", "second translucent dash")
+    require(pixel_hex(pixels, 30, 16, 3) == "ffffff", "corner phase gap")
+    require(pixel_hex(pixels, 30, 16, 5) == "808080", "corner phase continuation")
+    require(pixel_hex(pixels, 30, 3, 25) == "808080", "move phase reset")
+    operations.write_text("P 0 0 0\nD 2 6\nM -100 4\nL 6 4\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True, timeout=5)
+    pixels = pixels_from(output, 30, 30)
+    require(pixel_hex(pixels, 30, 0, 4) == "ffffff", "clipped travel reset phase")
+    require(pixel_hex(pixels, 30, 4, 4) == "000000", "clipped travel lost dash")
+    operations.write_text("P 0 0 0\nD 2 6\nD 0 0\nM 2 9\nL 18 9\n")
+    run([exe, str(operations), str(output), "30", "30"], check=True)
+    pixels = pixels_from(output, 30, 30)
+    require(pixel_hex(pixels, 30, 7, 9) == "000000", "solid reset changed")
+
+    # Two faces must tile with winding independence and top-left ownership.
+    operations.write_text("P 20 80 220\nT 2 2 0.4 10 2 0.4 10 10 0.4\nT 2 2 0.4 10 10 0.4 2 10 0.4\n")
+    run([exe, str(operations), str(output), "14", "14"], check=True)
+    pixels = pixels_from(output, 14, 14)
+    for y in range(2, 10):
+        for x in range(2, 10):
+            require(pixel_hex(pixels, 14, x, y) == "1450dc", "rectangle tiling sample")
+    require(pixel_hex(pixels, 14, 10, 5) == "ffffff", "top-left horizontal edge")
+    require(pixel_hex(pixels, 14, 5, 10) == "ffffff", "top-left vertical edge")
+
+    operations.write_text("P 30 60 220\nT 2 2 0.2 18 2 0.2 2 18 0.2\nP 220 40 30\nT 2 2 0.8 18 2 0.8 2 18 0.8\n")
+    run([exe, str(operations), str(output), "20", "20"], check=True)
+    pixels = pixels_from(output, 20, 20)
+    require(pixel_hex(pixels, 20, 4, 4) == "1e3cdc", "far triangle replaced near sample")
+    operations.write_text("P 20 190 70\nT 2 2 0.5 18 2 0.5 2 18 0.5\nP 220 40 40\nT 2 2 0.1 18 2 0.9 2 18 0.9\n")
+    run([exe, str(operations), str(output), "20", "20"], check=True)
+    pixels = pixels_from(output, 20, 20)
+    require(pixel_hex(pixels, 20, 3, 3) == "dc2828", "crossing depth near sample")
+    require(pixel_hex(pixels, 20, 12, 3) == "14be46", "crossing depth far sample")
+
+    long_fields ∈ str ← "M "
+    for ignored in range(500):
+        long_fields = long_fields + "0 "
+    malformed ∈ list[str] ← ["M 0 0 junk\n", long_fields + "\n",
+        "W 0\n", "W 1000001\n", "A -0.1\n", "A 1.1\n",
+        "M 0 0\nL 1 1 2 3\n", "M 0 0\nC 1 1 2 2 3 3 4 5\n",
+        "D 1\n", "D 1 0\n", "D 0 1\n", "D -1 4\n", "D 0.001 8\n", "D 1 4 5\n",
+        "T 0 0 0 1 0 0 0 1\n", "T 0 0 0 1 0 0 0 1 0 2\n",
+        "T 0 0 NaN 1 0 0 0 1 0\n", "T 0 0 1e39 1 0 0 0 1 0\n"]
+    for text in malformed:
+        operations.write_text(text)
+        rejected ∈ object ← run([exe, str(operations), str(output), "20", "10"], capture_output=True)
+        require(status(rejected) != 0, "malformed input accepted: " + text)
+
+print("native raster fixtures: PASS")
