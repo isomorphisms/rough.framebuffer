@@ -60,3 +60,76 @@ cp_status cp_coverage_plane_accumulate_5x5(cp_coverage_plane *plane,
                        neighborhood.occupied[row][column]);
     return CP_OK;
 }
+
+/* Conservative byte spans include row padding. The validated last active
+ * word bounds each span, so different origins and strides cannot trick
+ * this operation into reading a word it has just overwritten. Compare
+ * integer representations: relational comparison of unrelated C pointers
+ * is not defined. A nonrepresentable span fails closed. */
+static cp_status disjoint_mask_storage(const cp_coverage_plane *destination,
+    const cp_coverage_plane *source) {
+    size_t destination_words = ((size_t)destination->height - 1) *
+        destination->stride_words + destination->width;
+    size_t source_words = ((size_t)source->height - 1) *
+        source->stride_words + source->width;
+    if (destination_words > UINTPTR_MAX / sizeof(uint64_t) ||
+        source_words > UINTPTR_MAX / sizeof(uint64_t))
+        return CP_OVERFLOW;
+
+    uintptr_t destination_start = (uintptr_t)destination->occupied;
+    uintptr_t source_start = (uintptr_t)source->occupied;
+    uintptr_t destination_bytes = (uintptr_t)destination_words * sizeof(uint64_t);
+    uintptr_t source_bytes = (uintptr_t)source_words * sizeof(uint64_t);
+    if (destination_start > UINTPTR_MAX - destination_bytes ||
+        source_start > UINTPTR_MAX - source_bytes)
+        return CP_OVERFLOW;
+
+    uintptr_t destination_end = destination_start + destination_bytes;
+    uintptr_t source_end = source_start + source_bytes;
+    if (destination_start < source_end && source_start < destination_end)
+        return CP_INVALID;
+    return CP_OK;
+}
+
+cp_status cp_coverage_plane_combine(cp_coverage_plane *destination,
+    const cp_coverage_plane *source, cp_mask_operation operation) {
+    cp_status status = cp_coverage_plane_validate(destination);
+    if (status != CP_OK) return status;
+    status = cp_coverage_plane_validate(source);
+    if (status != CP_OK) return status;
+    if (operation != CP_MASK_UNION &&
+        operation != CP_MASK_INTERSECTION &&
+        operation != CP_MASK_DIFFERENCE &&
+        operation != CP_MASK_SYMMETRIC_DIFFERENCE)
+        return CP_INVALID;
+    status = disjoint_mask_storage(destination, source);
+    if (status != CP_OK) return status;
+
+    /* No failing operations occur after the preflight: bad inputs cannot
+     * leave a partially changed destination. Pixel bounds are computed in
+     * int64_t to support a negative origin and the full valid int range. */
+    for (unsigned row = 0; row < destination->height; ++row) {
+        int64_t source_row = (int64_t)destination->origin_y + row -
+            source->origin_y;
+        int row_inside = source_row >= 0 &&
+            source_row < (int64_t)source->height;
+        for (unsigned column = 0; column < destination->width; ++column) {
+            int64_t source_column = (int64_t)destination->origin_x +
+                column - source->origin_x;
+            uint64_t from = 0;
+            if (row_inside && source_column >= 0 &&
+                source_column < (int64_t)source->width)
+                from = source->occupied[(size_t)source_row *
+                    source->stride_words + (size_t)source_column];
+            uint64_t *into = &destination->occupied[(size_t)row *
+                destination->stride_words + column];
+            switch (operation) {
+            case CP_MASK_UNION: *into |= from; break;
+            case CP_MASK_INTERSECTION: *into &= from; break;
+            case CP_MASK_DIFFERENCE: *into &= ~from; break;
+            case CP_MASK_SYMMETRIC_DIFFERENCE: *into ^= from; break;
+            }
+        }
+    }
+    return CP_OK;
+}
