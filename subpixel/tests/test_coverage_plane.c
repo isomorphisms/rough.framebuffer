@@ -66,6 +66,13 @@ int main(void) {
     CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
         UINT32_C(0xffff0000), 1.0) == 0);
     CHECK(pixels[1] == UINT32_C(0xc0aa0055));
+    /* Exactly 16.5 alpha bytes must round upward. The old normalized-double
+     * calculation produced 16 after /255 and multiplication back by 255. */
+    one_word = (UINT64_C(1) << 33) - 1;
+    pixels[1] = UINT32_C(0x00f4e9d8);
+    CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
+        UINT32_C(0x40ff0000), 0.5) == 0);
+    CHECK(pixels[1] == UINT32_C(0x11ff0000));
     uint32_t before[4];
     memcpy(before, pixels, sizeof before);
     CHECK(rough_blend_subpixel_coverage(&framebuffer, &one,
