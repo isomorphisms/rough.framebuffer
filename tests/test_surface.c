@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct {
     unsigned triangles;
@@ -176,6 +177,44 @@ static uint64_t render_checksum(FILE *stream) {
     return checksum;
 }
 
+/* Pixel/depth equality across the old text-stream and the new direct draw
+ * path is stronger than rendering two different pictures that merely look
+ * similar. This compares every pixel and float across representative angles,
+ * the open Enneper patch, and a near-clipped torus. */
+static void test_direct_surface_equivalence(rough_surface_shape shape,
+                                             double angle, double distance) {
+    const unsigned width = 320u, height = 240u;
+    const size_t count = (size_t)width * height;
+    uint32_t *stream_pixels = malloc(count * sizeof *stream_pixels);
+    uint32_t *direct_pixels = malloc(count * sizeof *direct_pixels);
+    float *stream_depth = malloc(count * sizeof *stream_depth);
+    float *direct_depth = malloc(count * sizeof *direct_depth);
+    assert(stream_pixels && direct_pixels && stream_depth && direct_depth);
+    for (size_t i = 0; i < count; ++i) {
+        stream_pixels[i] = direct_pixels[i] = 0xffffffffu;
+        stream_depth[i] = direct_depth[i] = INFINITY;
+    }
+    rough_framebuffer via_stream = {stream_pixels, width, height, width,
+                                    stream_depth, width};
+    rough_framebuffer direct = {direct_pixels, width, height, width,
+                                direct_depth, width};
+    FILE *operations = generate(shape, angle, distance);
+    assert(rough_render_stream(operations, &via_stream) == 0);
+    assert(rough_draw_surface(&direct, shape, angle, distance) == 0);
+    assert(memcmp(stream_pixels, direct_pixels, count * sizeof *stream_pixels) == 0);
+    assert(memcmp(stream_depth, direct_depth, count * sizeof *stream_depth) == 0);
+    assert(rough_draw_surface(NULL, shape, angle, distance) == -1);
+    assert(rough_draw_surface(&direct, (rough_surface_shape)100,
+                              angle, distance) == -1);
+    assert(rough_draw_surface(&direct, shape, NAN, distance) == -1);
+    assert(rough_draw_surface(&direct, shape, angle, -1.0) == -1);
+    assert(fclose(operations) == 0);
+    free(stream_pixels);
+    free(direct_pixels);
+    free(stream_depth);
+    free(direct_depth);
+}
+
 int main(void) {
     FILE *torus0 = generate(ROUGH_SURFACE_TORUS, 0.0, 5.2);
     FILE *torus0_repeat = generate(ROUGH_SURFACE_TORUS, 360.0, 5.2);
@@ -198,6 +237,10 @@ int main(void) {
     uint64_t third = render_checksum(enneper);
     assert(first != second);
     assert(first != third);
+    test_direct_surface_equivalence(ROUGH_SURFACE_TORUS, 0.0, 5.2);
+    test_direct_surface_equivalence(ROUGH_SURFACE_TORUS, 37.0, 5.2);
+    test_direct_surface_equivalence(ROUGH_SURFACE_ENNEPER, 25.0, 5.2);
+    test_direct_surface_equivalence(ROUGH_SURFACE_TORUS, 30.0, 0.55);
 
     assert(rough_emit_surface(NULL, ROUGH_SURFACE_TORUS, 0.0, 320, 240, 5.2) == -1);
     assert(rough_emit_surface(torus0, (rough_surface_shape)99, 0.0, 320, 240, 5.2) == -1);

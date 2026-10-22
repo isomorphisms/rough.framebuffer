@@ -218,3 +218,16 @@ not an alternative rasterizer or an Android build. See
 [the surface integration contract](docs/surfaces.md). Fulton in
 `walnut-burgundy` remains upstream for algebraic curves, intersections
 and mathematical composition.
+
+## Native display preparation (source qualification)
+
+The original Android art draft's gesture reducer, direct geometry-to-framebuffer
+path, and straight-alpha RGBA8888 software presenter are preserved and
+independently exercised as native C via pinned ICK/Ike. The old GNU Make
+and ad-hoc GCC/Clang build routes have **not** been reintroduced.
+
+The historical NativeActivity source and manifest are retained as unqualified
+Android consumers. Actual A1/C67 packaging remains with the maintained
+android-NDK, Kitchen and Cat Food boundaries; current source admission does not
+claim a new APK, real device run or signer acceptance. See
+[Android source scope](android/README.md).

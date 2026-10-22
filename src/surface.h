@@ -2,6 +2,7 @@
 #define ROUGH_SURFACE_H
 
 #include <stdio.h>
+#include "framebuffer.h"
 
 /* Mathematical sampling is a source of the existing framebuffer P/T operation
  * stream, not a second renderer. A positive camera z points into the scene.
@@ -20,5 +21,12 @@ typedef enum {
  */
 int rough_emit_surface(FILE *out, rough_surface_shape shape, double degrees,
                        unsigned width, unsigned height, double camera_distance);
+
+/* Render the same geometry and colors directly into caller-owned pixels/depth,
+ * without serializing triangle operations to a temporary file. No implicit
+ * framebuffer clear or ownership transfer occurs. Explicit normal/alpha
+ * semantics match the P/T stream exactly. */
+int rough_draw_surface(rough_framebuffer *target, rough_surface_shape shape,
+                       double degrees, double camera_distance);
 
 #endif
