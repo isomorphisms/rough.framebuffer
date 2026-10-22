@@ -140,7 +140,7 @@ int rough_draw_surface_aa2(rough_framebuffer *destination,
         }
     }
 
-    if (rough_draw_surface(scratch, shape, angle_degrees, camera_distance))
+    if (rough_draw_surface_smooth(scratch, shape, angle_degrees, camera_distance))
         return -1;
     return rough_resolve_2x2(scratch, destination);
 }

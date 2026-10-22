@@ -249,3 +249,18 @@ colors, padding, clipping and deterministic rerender assertions run under ICK
 and the maintained Ike test route. The test-only Android overlay is source
 only until packaging and A1/C67 validation are repeated. No duplicate
 Subpixel library or GNU Make build is imported from the old Android branch.
+
+## Smooth analytic surface lighting
+
+The retained smooth-shading candidate interpolates analytic surface
+normals and base colors perspective-correctly at each covered sample after
+camera near-plane clipping, while preserving the flat P/T stream,
+sample coverage and z-depth conventions. Torus seams remain periodic.
+The independent numerical test checks central-difference normals,
+continuous seams, projective interpolation, varying fragment lighting,
+actual surface depth equality and a constant-normal source mutant.
+
+This is a host source implementation under ICK/Ike. Its source host
+qualification does not prove a new C67 APK, measured graphics performance,
+or physically smooth image. Fulton remains upstream for mathematical
+intersection and composition semantics.

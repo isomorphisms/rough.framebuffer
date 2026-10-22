@@ -1,0 +1,39 @@
+# Android-only exception recorded in ci/build-toolchain.tsv. Host product
+# qualification remains ICK/Ike; this recipe never selects ambient cc/make.
+set -o errexit -o nounset -o pipefail
+var root = "$(git rev-parse --show-toplevel)"
+var ndk = ENV.ANDROID_NDK_HOME
+var tools = "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
+var glue = "$ndk/sources/android/native_app_glue"
+test -f "$glue/android_native_app_glue.c"
+test -x "$tools/llvm-readelf"
+for abi in armeabi-v7a arm64-v8a x86_64 {
+    var triple = 'armv7a-linux-androideabi'
+    if (abi === 'arm64-v8a') { setvar triple = 'aarch64-linux-android' }
+    if (abi === 'x86_64') { setvar triple = 'x86_64-linux-android' }
+    var compiler = "$tools/${triple}21-clang"
+    var output = "$root/build/android/$abi"
+    test -x "$compiler"
+    mkdir -p "$output"
+    "$compiler" -std=c11 -O2 -fPIC -Wall -Wextra -Werror \
+        -Wno-unused-parameter -isystem "$glue" \
+        -c "$glue/android_native_app_glue.c" -o "$output/glue.o"
+    "$compiler" -std=c11 -O2 -fPIC -shared -Wall -Wextra -Werror -pedantic \
+        -isystem "$glue" "-I$root/src" "-I$root/subpixel/include" \
+        "$root/android/native/rough_android.c" \
+        "$root/src/touch.c" "$root/src/surface.c" "$root/src/framebuffer.c" \
+        "$root/src/present.c" "$root/src/surface_aa.c" \
+        "$root/src/subpixel_demo.c" "$root/subpixel/src/curve_patch.c" \
+        "$root/subpixel/src/curve_patch_5x5.c" "$output/glue.o" \
+        -Wl,--no-undefined -Wl,-soname,libroughart.so \
+        -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 \
+        -landroid -llog -lm -o "$output/libroughart.so"
+    "$tools/llvm-readelf" -h "$output/libroughart.so" > "$output/elf-header.txt"
+    "$tools/llvm-readelf" -lW "$output/libroughart.so" > "$output/elf-programs.txt"
+    awk '$1=="LOAD" {count++; if ($NF != "0x4000") exit 1} END {if (count < 1) exit 1}' \
+        "$output/elf-programs.txt"
+    sha256sum "$output/libroughart.so"
+}
+grep -Eq 'Class: *ELF64' build/android/arm64-v8a/elf-header.txt
+grep -Eq 'Machine: *AArch64' build/android/arm64-v8a/elf-header.txt
+printf '\033[32mPASS\033[0m NDK native closures: A1 ARM32, C67 ARM64, emulator x86_64\n'
