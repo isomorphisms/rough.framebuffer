@@ -293,6 +293,21 @@ static int32_t input_event(struct android_app *app, AInputEvent *event) {
     rough_touch_event type;
 
     if (kind == AMOTION_EVENT_ACTION_MOVE) {
+        if (state->touch.pinching) {
+            int changed = 0;
+            for (size_t i = 0; i < count; ++i) {
+                int result = rough_touch_apply(&state->touch, ROUGH_TOUCH_MOVE,
+                    AMotionEvent_getPointerId(event, i),
+                    AMotionEvent_getX(event, i), AMotionEvent_getY(event, i));
+                if (result < 0) return 0;
+                changed |= result;
+            }
+            if (changed) {
+                ++state->input_sequence;
+                state->dirty = 1;
+            }
+            return 1;
+        }
         index = count;
         for (size_t i = 0; i < count; ++i) {
             if (AMotionEvent_getPointerId(event, i) ==

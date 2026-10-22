@@ -14,7 +14,7 @@ source directory instead of relying on the caller's current directory.
 
 `package-test.grease` uses the maintained android-NDK packager, preserves
 `org.isomorphisms.roughframebuffer` and the central public-test certificate,
-and advances versionCode from 1 to 2. The digest-bound historical artifact
+and uses versionCode 3 for the pinch-zoom update. The digest-bound historical artifact
 is used solely for update identity comparison, not source qualification.
 Every finished single-ABI package goes through Flexible Pipes'
 `android-apk-preflight` and its accepted independent AI-CI producer gate.

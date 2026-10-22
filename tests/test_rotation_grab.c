@@ -107,10 +107,8 @@ int main(void) {
     REQUIRE(rough_touch_init(&state, 160, 320) == 0, "bad init");
     REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_DOWN, 1, 30, 60) == 0,
             "bad primary down");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_DOWN, 2, 50, 60) == 0,
-            "secondary pointer stole gesture");
     REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_MOVE, 2, 120, 60) == 0,
-            "secondary finger rotated object");
+            "untracked pointer rotated object");
     REQUIRE(state.yaw_degrees == 0.0, "secondary pointer changed yaw");
     REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_MOVE, 1, 70, 60) == 1,
             "primary drag ignored");

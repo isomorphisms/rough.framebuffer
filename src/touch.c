@@ -34,6 +34,7 @@ int rough_touch_init(rough_touch_state *state, unsigned width, unsigned height) 
     state->shape = ROUGH_SURFACE_TORUS;
     state->camera_distance = 5.2;
     state->active_pointer_id = -1;
+    state->secondary_pointer_id = -1;
     return 0;
 }
 
@@ -44,6 +45,8 @@ int rough_touch_resize(rough_touch_state *state, unsigned width, unsigned height
     state->active = 0;                 /* previous coordinate frame is invalid */
     state->active_pointer_id = -1;
     state->moved = 0;
+    state->pinching = 0;
+    state->secondary_pointer_id = -1;
     return 0;
 }
 
@@ -55,17 +58,35 @@ int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
          event != ROUGH_TOUCH_UP && event != ROUGH_TOUCH_CANCEL)) return -1;
 
     if (event == ROUGH_TOUCH_DOWN) {
-        if (state->active) return 0; /* another finger does not seize control */
+        if (state->active) {
+            if (state->pinching || pointer_id == state->active_pointer_id)
+                return 0;
+            double span = hypot(x - state->pointer_x, y - state->pointer_y);
+            if (!isfinite(span) || span < 1e-6) return 0;
+            state->pinching = 1;
+            state->secondary_pointer_id = pointer_id;
+            state->secondary_x = x;
+            state->secondary_y = y;
+            state->pinch_span = span;
+            state->pinch_distance = state->camera_distance;
+            state->moved = 1; /* a pinch is never a shape-switch tap */
+            return 0;
+        }
         state->active = 1;
         state->active_pointer_id = pointer_id;
         state->moved = 0;
         state->down_x = x;
         state->down_y = y;
+        state->pointer_x = x;
+        state->pointer_y = y;
+        state->pinching = 0;
+        state->secondary_pointer_id = -1;
         state->anchor_yaw = state->yaw_degrees;
         state->anchor_distance = state->camera_distance;
         return 0;
     }
-    if (!state->active || state->active_pointer_id != pointer_id) return 0;
+    if (!state->active || (state->active_pointer_id != pointer_id &&
+        (!state->pinching || state->secondary_pointer_id != pointer_id))) return 0;
 
     if (event == ROUGH_TOUCH_CANCEL) {
         int changed = (state->yaw_degrees != state->anchor_yaw ||
@@ -75,8 +96,41 @@ int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
         state->active = 0;
         state->active_pointer_id = -1;
         state->moved = 0;
+        state->pinching = 0;
+        state->secondary_pointer_id = -1;
         return changed;
     }
+
+    if (state->pinching) {
+        if (event == ROUGH_TOUCH_UP) {
+            state->active = 0;
+            state->active_pointer_id = -1;
+            state->secondary_pointer_id = -1;
+            state->pinching = 0;
+            state->moved = 0;
+            return 0;
+        }
+        double first_x = pointer_id == state->active_pointer_id ? x : state->pointer_x;
+        double first_y = pointer_id == state->active_pointer_id ? y : state->pointer_y;
+        double second_x = pointer_id == state->secondary_pointer_id ? x : state->secondary_x;
+        double second_y = pointer_id == state->secondary_pointer_id ? y : state->secondary_y;
+        double span = hypot(second_x - first_x, second_y - first_y);
+        if (!isfinite(span)) return -1;
+        double distance = bounded(state->pinch_distance *
+                                  (state->pinch_span / fmax(span, 1e-6)),
+                                  TOUCH_MIN_CAMERA_DISTANCE,
+                                  TOUCH_MAX_CAMERA_DISTANCE);
+        int changed = distance != state->camera_distance;
+        state->pointer_x = first_x;
+        state->pointer_y = first_y;
+        state->secondary_x = second_x;
+        state->secondary_y = second_y;
+        state->camera_distance = distance;
+        return changed;
+    }
+
+    state->pointer_x = x;
+    state->pointer_y = y;
 
     double dx = x - state->down_x;
     double dy = y - state->down_y;

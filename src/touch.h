@@ -9,7 +9,9 @@
  *
  * A horizontal drag rotates the surface; vertical drag changes camera
  * distance (a bounded zoom). A tap toggles torus/Enneper. Gesture cancellation
- * restores the pre-gesture view. Only the first down pointer owns a gesture.
+ * restores the pre-gesture view. Two fingers zoom by their separation:
+ * spreading moves the camera closer. Lifting either ends the pinch without
+ * toggling the shape; remaining-finger motion waits for a fresh down.
  */
 typedef enum {
     ROUGH_TOUCH_DOWN = 1,
@@ -29,6 +31,9 @@ typedef struct {
     unsigned height;
     double down_x, down_y;
     double anchor_yaw, anchor_distance;
+    int pinching, secondary_pointer_id;
+    double pointer_x, pointer_y, secondary_x, secondary_y;
+    double pinch_span, pinch_distance;
 } rough_touch_state;
 
 /* Return 0 on valid state or -1 on bad dimensions/target. */
@@ -36,7 +41,7 @@ int rough_touch_init(rough_touch_state *state, unsigned width, unsigned height);
 int rough_touch_resize(rough_touch_state *state, unsigned width, unsigned height);
 
 /* Return 1 when pixels must be rendered again, 0 if no visible state change,
- * -1 for invalid input. An ignored secondary pointer returns 0. */
+ * -1 for invalid input. An untracked third pointer returns 0. */
 int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
                       int pointer_id, double x, double y);
 

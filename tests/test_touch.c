@@ -48,10 +48,9 @@ int main(void) {
     unsigned painted;
     uint64_t initial = render_frame(&touch, &painted);
 
-    /* Motion without a down is inert; a second pointer cannot steal drag. */
+    /* Motion without a down is inert; an unknown pointer cannot steal drag. */
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 0, 60, 40) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 7, 20, 40) == 0);
-    assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 8, 40, 40) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 8, 90, 40) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_UP, 8, 90, 40) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 7, 25, 40) == 0);
@@ -98,6 +97,48 @@ int main(void) {
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 0, NAN, 0) == -1);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, -1, 0, 0) == -1);
     assert(rough_touch_apply(&touch, (rough_touch_event)99, 0, 0, 0) == -1);
+
+    /* Exact span ratios, not pointer indices or motion direction: spreading
+     * twice as far halves camera distance and changes actual painted pixels. */
+    assert(rough_touch_init(&touch, WIDTH, HEIGHT) == 0);
+    initial = render_frame(&touch, &painted);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 17, 40, 80) == 0);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 93, 80, 80) == 0);
+    assert(touch.pinching && touch.active_pointer_id == 17);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 4, 10, 10) == 0);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 4, 150, 150) == 0);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 120, 80) == 1);
+    assert(fabs(touch.camera_distance - 2.6) < 1e-12);
+    assert(touch.yaw_degrees == 0.0 && touch.shape == ROUGH_SURFACE_TORUS);
+    assert(render_frame(&touch, &painted) != initial);
+    /* Pinching together zooms out, with upper/lower and zero-span bounds. */
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 60, 80) == 1);
+    assert(fabs(touch.camera_distance - 10.4) < 1e-12);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 40, 80) == 1);
+    assert(touch.camera_distance == 12.0);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 1000, 80) == 1);
+    assert(touch.camera_distance == 2.4);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_CANCEL, 17, 40, 80) == 1);
+    assert(!touch.active && !touch.pinching && touch.camera_distance == 5.2);
+    assert(render_frame(&touch, &painted) == initial);
+    /* Either lift ends the pinch, without a tap or a remaining-finger jump. */
+    for (unsigned primary_lifts = 0; primary_lifts < 2; ++primary_lifts) {
+        assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 17, 40, 80) == 0);
+        assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 93, 80, 80) == 0);
+        assert(rough_touch_apply(&touch, ROUGH_TOUCH_UP,
+                                primary_lifts ? 17 : 93, 40, 80) == 0);
+        assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE,
+                                primary_lifts ? 93 : 17, 140, 10) == 0);
+        assert(touch.shape == ROUGH_SURFACE_TORUS && touch.yaw_degrees == 0.0);
+        assert(!touch.active && !touch.pinching);
+    }
+    /* Both fingers moving uses their separation, independent of IDs. */
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 93, 40, 40) == 0);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 17, 40, 80) == 0);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 40, 20) == 1);
+    assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 17, 40, 100) == 1);
+    assert(fabs(touch.camera_distance - 2.6) < 1e-12);
+    assert(rough_touch_resize(&touch, 240, 320) == 0 && !touch.pinching);
     puts("native gesture -> changed framebuffer pixels/depth: PASS");
     return 0;
 }
