@@ -1,14 +1,15 @@
 # Ike's literal v1 grammar: no GNU Make variables or implicit rules.
 # Project code is built only by ICK inside the checked recipe.
-all depends on Ikefile subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c src/framebuffer.c src/main.c subpixel/include/subpixel/path.h subpixel/src/path.c subpixel/tests/test_path.c subpixel/examples/font_5x7.h subpixel/examples/font_5x7.c subpixel/examples/font_5x7_dump.c subpixel/tests/test_font_5x7.c tests/test_raster_ick.c tests/test_api.c
+all depends on Ikefile subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c src/framebuffer.c src/main.c subpixel/include/subpixel/path.h subpixel/src/path.c subpixel/tests/test_path.c subpixel/examples/font_5x7.h subpixel/examples/font_5x7.c subpixel/examples/font_5x7_dump.c subpixel/tests/test_font_5x7.c tests/test_raster_ick.c tests/test_api.c src/surface.h src/surface.c src/surface_main.c tests/test_surface.c
     sh subpixel/qualification/test-ick.sh
 
-test depends on Ikefile subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c subpixel/tests/test_coverage_plane.c subpixel/tests/test_curve_patch.c subpixel/tests/test_curve_patch_5x5.c subpixel/examples/font_5x7.h subpixel/examples/font_5x7.c subpixel/examples/font_5x7_dump.c subpixel/tests/test_font_5x7.c tests/test_raster_ick.c tests/test_api.c subpixel/include/subpixel/path.h subpixel/src/path.c subpixel/tests/test_path.c src/framebuffer.c src/framebuffer.h
+test depends on Ikefile subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh subpixel/include/subpixel/curve_patch.h subpixel/include/subpixel/coverage_plane.h subpixel/src/curve_patch.c subpixel/src/curve_patch_5x5.c subpixel/src/coverage_plane.c src/subpixel_framebuffer.h src/subpixel_framebuffer.c subpixel/tests/test_coverage_plane.c subpixel/tests/test_curve_patch.c subpixel/tests/test_curve_patch_5x5.c subpixel/examples/font_5x7.h subpixel/examples/font_5x7.c subpixel/examples/font_5x7_dump.c subpixel/tests/test_font_5x7.c tests/test_raster_ick.c tests/test_api.c subpixel/include/subpixel/path.h subpixel/src/path.c subpixel/tests/test_path.c src/framebuffer.c src/framebuffer.h src/surface.h src/surface.c src/surface_main.c tests/test_surface.c
     sh subpixel/qualification/test-ick.sh
 
 clean depends on Ikefile
     rm -rf build subpixel/build
 
+# Headless torus/Enneper source producer is qualified by the same ICK test recipe.
 # Policy-only qualification; no GNU Make product or reference-compiler lane.
 policy-check depends on Ikefile qualification/test-compiler-policy.sh scripts/run-ike.sh subpixel/qualification/test-ick.sh qualification/test-subpixel-name.sh
     sh qualification/test-compiler-policy.sh

@@ -88,13 +88,21 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/tests/test_raster_ick.c" -o "$out/test_raster_ick.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/tests/test_api.c" -o "$out/test_api.o"
+# Qualify the preserved historical headless art source against current ICK.
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/src/surface.c" -o "$out/surface.o"
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/src/surface_main.c" -o "$out/surface_main.o"
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/tests/test_surface.c" -o "$out/test_surface.o"
 
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
               "$out/coverage_plane.o" "$out/subpixel_framebuffer.o" "$out/test_coverage_plane.o" \
               "$out/path.o" "$out/test_path.o" \
               "$out/font_5x7.o" "$out/test_font_5x7.o" "$out/font_5x7_dump.o" \
-              "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o" "$out/test_api.o"; do
+              "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o" "$out/test_api.o" \
+              "$out/surface.o" "$out/surface_main.o" "$out/test_surface.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
     readelf -h "$object" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
@@ -120,6 +128,10 @@ done
     -lm -o "$out/test_api"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/rough_main.o" \
     -lm -o "$repo_root/build/rough-fb"
+"$HOST_LINKER" "$out/surface.o" "$out/surface_main.o" -lm \
+    -o "$repo_root/build/rough-surface"
+"$HOST_LINKER" "$out/framebuffer.o" "$out/surface.o" "$out/test_surface.o" -lm \
+    -o "$out/test_surface"
 
 echo "ICK source: $ick_pin"
 echo "ICK compiler: $ICK_CC"
@@ -146,6 +158,35 @@ test -s "$out/font-5x7-subpixels.txt"
 sha256sum "$out/font-5x7-subpixels.txt"
 "$out/test_raster_ick"
 "$out/test_api"
+"$out/test_surface"
+# Reproducible genuine source-stage frames, not a recorded movie or mock image.
+"$repo_root/build/rough-surface" torus 40 160 160 > "$out/torus-40.ops"
+"$repo_root/build/rough-surface" torus 40 160 160 > "$out/torus-40-repeat.ops"
+"$repo_root/build/rough-surface" enneper 25 160 160 > "$out/enneper-25.ops"
+cmp "$out/torus-40.ops" "$out/torus-40-repeat.ops"
+test -s "$out/torus-40.ops" && test -s "$out/enneper-25.ops"
+"$repo_root/build/rough-fb" "$out/torus-40.ops" "$out/torus-40.ppm" 160 160
+"$repo_root/build/rough-fb" "$out/enneper-25.ops" "$out/enneper-25.ppm" 160 160
+test -s "$out/torus-40.ppm" && test -s "$out/enneper-25.ppm"
+sha256sum "$out/surface.o" "$out/surface_main.o" "$out/test_surface.o" \
+    "$out/test_surface" "$repo_root/build/rough-surface" \
+    "$out/torus-40.ppm" "$out/enneper-25.ppm"
+# The original surface seam test must refuse a genuinely nonperiodic palette,
+# using the same ICK frontend and its original independent test program.
+sed -e 's/sin(u)/sin(1.3 * u)/' -e 's/cos(2.0 [*] v)/cos(1.8 * v)/' \
+    "$repo_root/src/surface.c" > "$out/surface-palette-mutant.c"
+grep -Fq 'sin(1.3 * u)' "$out/surface-palette-mutant.c"
+grep -Fq 'cos(1.8 * v)' "$out/surface-palette-mutant.c"
+"$ICK_CC" $flags -I"$repo_root/src" -c "$out/surface-palette-mutant.c" \
+    -o "$out/surface-palette-mutant.o"
+"$HOST_LINKER" "$out/framebuffer.o" "$out/surface-palette-mutant.o" \
+    "$out/test_surface.o" -lm -o "$out/reject-surface-palette"
+ulimit -c 0
+if "$out/reject-surface-palette" > "$out/reject-surface-palette.log" 2>&1; then
+    echo 'Defective torus color seam accepted' >&2; exit 1
+fi
+grep -Fq 'torus seam palette jump' "$out/reject-surface-palette.log"
+echo 'ICK headless mathematical surface source/renderer and palette mutant: PASS'
 
 # Preserve both real source regressions from the integrated continuous-stroke
 # parent within the existing Ike-v1 POSIX recipe boundary. All mutated C is

@@ -209,3 +209,12 @@ is tracked in [SUN #120](https://github.com/isomorphisms/flexible-pipes/issues/1
 The `test`/`preview` Ike recipes run the naming gate, which rejects tracked stale
 paths/text and attempts to compile two intentionally obsolete interface probes using
 pinned ICK. The native coverage and composition source mathematics are unchanged.
+
+## Headless mathematical surface source
+
+The preserved torus/Enneper P/T generator and its real framebuffer-pixel
+tests run under the same pinned ICK/Ike test route. This is a source stage,
+not an alternative rasterizer or an Android build. See
+[the surface integration contract](docs/surfaces.md). Fulton in
+`walnut-burgundy` remains upstream for algebraic curves, intersections
+and mathematical composition.
