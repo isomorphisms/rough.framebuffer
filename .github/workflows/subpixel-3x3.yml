@@ -147,8 +147,10 @@ jobs:
           ICK_CC: ${{ github.workspace }}/ick-toolchain/stage/bin/x86_64-linux-gnu-gcc
           ICK_SOURCE_DIR: ${{ github.workspace }}/ick-toolchain
           HOST_LINKER: /usr/bin/x86_64-linux-gnu-gcc
+          ROUGH_COMPARISON_DIR: ${{ github.workspace }}/build/comparison
         run: |
           set -euo pipefail
+          mkdir -p build/comparison
           export IKE_BIN="$GITHUB_WORKSPACE/.owned/bin/ike"
           export IKE_SOURCE_DIR="$GITHUB_WORKSPACE/ike-toolchain"
           export IKE_EXPECTED_SHA256="$(sha256sum "$IKE_BIN" | cut -d ' ' -f1)"
@@ -255,6 +257,7 @@ jobs:
             subpixel/build/*.ppm
             subpixel/build/*.tsv
             subpixel/build/ick/path.su
+            build/comparison/*.ppm
           if-no-files-found: error
           retention-days: 14
 

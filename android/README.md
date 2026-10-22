@@ -1,5 +1,33 @@
 # NativeActivity source retained from the original Android art draft
 
+## Reproducible current-head test packaging
+
+`build-ndk.grease` replaces the retired Android Makefile. It uses only the
+explicit NDK exception already recorded in `ci/build-toolchain.tsv`, compiles
+the complete native closure including the retained Subpixel diagnostic,
+and checks 16 KiB ELF load alignment for ARM32, ARM64 and x86-64.
+The platform-neutral host source and mutation tests remain under ICK/Ike.
+
+`package-test.grease` uses the maintained android-NDK packager, preserves
+`org.isomorphisms.roughframebuffer` and the central public-test certificate,
+and advances versionCode from 1 to 2. The digest-bound historical artifact
+is used solely for update identity comparison, not source qualification.
+Every finished single-ABI package goes through Flexible Pipes'
+`android-apk-preflight` and its accepted independent AI-CI producer gate.
+This preflight is package acceptance, not a registered end-to-end FP Android
+producer dispatch or a physical-device receipt.
+
+The current-head Android workflow exercises actual Android 14 launch,
+drag, shape switch, zoom and restart against the existing independent
+pixel oracle, including an unchanged-image rejection control. Historical
+workflow results remain historical; a new workflow must actually pass.
+
+Set `ROUGH_COMPARISON_DIR` to an existing output directory while running
+the ICK/Ike host test target to retain deterministic torus/Enneper PPMs.
+Each image shows the preserved flat single-sample render on the left and
+current AA2/smooth shading on the right, at the same size, yaw and distance.
+This compares production raster functions; it does not measure C67 speed.
+
 This directory preserves the existing C NativeActivity consumer and its
 manifest, with the stable historical package identity. The renderer remains
 the common rough.framebuffer library; the Android layer owns window,

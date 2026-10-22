@@ -7,6 +7,40 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Optional reproducible comparison from the actual production functions.
+ * The left image is the preserved flat single-sample route; the right is
+ * the candidate AA2 route (analytic-normal shading on this branch).
+ * No screen-space smoothing or replacement surface generator is involved. */
+static void comparison(const uint32_t *before, const uint32_t *after,
+                       unsigned width, unsigned height,
+                       rough_surface_shape shape, double yaw, double distance) {
+    const char *directory = getenv("ROUGH_COMPARISON_DIR");
+    if (!directory) return;
+    char path[4096];
+    int length = snprintf(path, sizeof path, "%s/%s-%.0f-%.2f.ppm",
+                          directory,
+                          shape == ROUGH_SURFACE_TORUS ? "torus" : "enneper",
+                          yaw, distance);
+    assert(length > 0 && (size_t)length < sizeof path);
+    FILE *output = fopen(path, "wb");
+    assert(output);
+    assert(fprintf(output, "P6\n%u %u\n255\n", width * 2u, height) > 0);
+    for (unsigned y = 0; y < height; ++y) {
+        for (unsigned side = 0; side < 2u; ++side) {
+            const uint32_t *image = side ? after : before;
+            for (unsigned x = 0; x < width; ++x) {
+                uint32_t color = image[(size_t)y * width + x];
+                unsigned char rgb[3] = {
+                    (unsigned char)(color >> 16),
+                    (unsigned char)(color >> 8), (unsigned char)color
+                };
+                assert(fwrite(rgb, 1, sizeof rgb, output) == sizeof rgb);
+            }
+        }
+    }
+    assert(fclose(output) == 0);
+}
+
 static void test_explicit_edge_coverage_and_depth(void) {
     uint32_t high_pixels[4u * 6u];
     float high_depth[4u * 6u];
@@ -128,6 +162,7 @@ static void test_real_math_surface(rough_surface_shape shape,
     assert(foreground > 100u);
     assert(changed > 20u);
     assert(fractional > 4u);
+    comparison(plain_pixels, pixels, width, height, shape, yaw, distance);
 
     /* Caller scratch is recycled, but each AA call clears stale depth/color.
      * A repeated identical render must produce exactly identical bytes. */
