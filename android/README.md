@@ -7,6 +7,10 @@ explicit NDK exception already recorded in `ci/build-toolchain.tsv`, compiles
 the complete native closure including the retained Subpixel diagnostic,
 and checks 16 KiB ELF load alignment for ARM32, ARM64 and x86-64.
 The platform-neutral host source and mutation tests remain under ICK/Ike.
+The packager receives stripped native libraries. Unstripped debugging copies
+remain separate, with before/after byte counts and an exported-entrypoint
+check after stripping. Both build and packaging scripts locate their own
+source directory instead of relying on the caller's current directory.
 
 `package-test.grease` uses the maintained android-NDK packager, preserves
 `org.isomorphisms.roughframebuffer` and the central public-test certificate,

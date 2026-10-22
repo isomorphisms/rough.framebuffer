@@ -1,7 +1,8 @@
+#!/usr/bin/env grease
 # Android-only exception recorded in ci/build-toolchain.tsv. Host product
 # qualification remains ICK/Ike; this recipe never selects ambient cc/make.
 set -o errexit -o nounset -o pipefail
-var root = "$(git rev-parse --show-toplevel)"
+var root = "$(dirname -- "$(dirname -- "$(realpath -- "$0")")")"
 var ndk = ENV.ANDROID_NDK_HOME
 var tools = "$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin"
 var glue = "$ndk/sources/android/native_app_glue"
@@ -28,12 +29,19 @@ for abi in armeabi-v7a arm64-v8a x86_64 {
         -Wl,--no-undefined -Wl,-soname,libroughart.so \
         -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 \
         -landroid -llog -lm -o "$output/libroughart.so"
+    # Keep symbols only in a separate debugging file, never in the APK payload.
+    cp "$output/libroughart.so" "$output/libroughart.debug.so"
+    printf 'native_size_before\t%s\n' "$(wc -c < "$output/libroughart.so")" > "$output/native-size.tsv"
+    "$tools/llvm-strip" --strip-unneeded "$output/libroughart.so"
+    printf 'native_size_after\t%s\n' "$(wc -c < "$output/libroughart.so")" >> "$output/native-size.tsv"
+    "$tools/llvm-readelf" --dyn-syms "$output/libroughart.so" > "$output/elf-symbols.txt"
+    grep -Fq ANativeActivity_onCreate "$output/elf-symbols.txt"
     "$tools/llvm-readelf" -h "$output/libroughart.so" > "$output/elf-header.txt"
     "$tools/llvm-readelf" -lW "$output/libroughart.so" > "$output/elf-programs.txt"
     awk '$1=="LOAD" {count++; if ($NF != "0x4000") exit 1} END {if (count < 1) exit 1}' \
         "$output/elf-programs.txt"
     sha256sum "$output/libroughart.so"
 }
-grep -Eq 'Class: *ELF64' build/android/arm64-v8a/elf-header.txt
-grep -Eq 'Machine: *AArch64' build/android/arm64-v8a/elf-header.txt
+grep -Eq 'Class: *ELF64' "$root/build/android/arm64-v8a/elf-header.txt"
+grep -Eq 'Machine: *AArch64' "$root/build/android/arm64-v8a/elf-header.txt"
 printf '\033[32mPASS\033[0m NDK native closures: A1 ARM32, C67 ARM64, emulator x86_64\n'

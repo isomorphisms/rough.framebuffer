@@ -1,5 +1,30 @@
 # Subpixel: local 3×3 and 5×5 curvature neighborhoods
 
+## Sample-level region algebra
+
+`cp_coverage_plane_combine(destination, source, operation)` computes union,
+intersection, difference or symmetric difference **on each of the 64 bits**
+of every active destination pixel. The destination's global coordinates,
+including negative origins and padded strides, define the output rectangle.
+Source samples outside its rectangle are zero; intersection therefore clears
+those destination pixels. It neither normalizes masks to gray nor rounds their
+popcounts. In particular, disjoint four-bit masks can union to eight bits:
+their coverage fractions alone lose the geometric information.
+
+Use separate planes to assemble a single logical compound shape, including
+the intended holes, before calling `rough_blend_subpixel_coverage` exactly once
+for that shape/color. A difference operation can remove a counter from a
+glyph or a region without making an antialiasing halo. Composite different
+colors as separate source-over operations instead of using Boolean mask algebra
+to invent a color mixing rule.
+
+The two planes may have different origins and sizes. Layouts, operation, and
+all backing-storage aliases are checked before any destination write; on
+failure the destination is unchanged. Only active destination words change;
+source and padding are never modified. No buffers are allocated internally.
+This API operates on **already rasterized** sample masks; it does not yet
+implement a filled-contour winding rule or depth-aware surfaces.
+
 ## Reusable occupancy plane and framebuffer boundary
 
 `subpixel/coverage_plane.h` exposes bounded caller-owned occupancy storage.

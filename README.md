@@ -14,15 +14,19 @@ continuous strokes rather than integer pixel walks: it provides coverage
 antialiasing, straight-alpha source-over composition, round caps, linearly tapered
 widths, and adaptive cubic subdivision. It also fills flat-color screen-space
 triangles with barycentric depth interpolation and a half-open shared-edge rule.
-It does not yet implement ellipses, SVG paths, hachures, textured brushes, joins as
-an independently selectable style, antialiased triangle edges, perspective-correct
-attributes, a camera, or mesh clipping.
+The native surface layer also supplies a camera, near-plane clipping and
+depth-aware 2×2 triangle sampling. The smooth-lighting layer supplies
+perspective-correct attributes. Ellipses, SVG paths, hachures, textured brushes
+and independently selectable joins remain outside the implemented stroke slice.
+
+[Mathematical and rendering ownership](docs/rendering-boundary.md) defines the
+boundary with Fulton, applications, Android packaging and WIGGLE-VIDEO-01.
 
 ## Owned toolchains only
 
 The **authoritative build orchestrator is [Ike](https://github.com/dilapidated-shed/ike)** with its checked `Ikefile` and `ike-build-v1` receipt. Consumer C code is compiled exclusively by pinned source-built **[ICK](https://github.com/dilapidated-shed/ick)**. ICKY remains the developing parser; Ithon/ILua and other owned tools must be used only at stages they actually support.
 
-GNU Make is explicitly blocked by the top-level and Subpixel `Makefile` stubs. There is no `CC=cc`, GCC, Clang, NDK or GNU Make product fallback. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands a pinned compiled Ike, caller-supplied expected executable digest (independent verification pending) and fresh receipt path. Refer to [owned-toolchain qualification](subpixel/qualification/README.md).
+GNU Make is explicitly blocked by the top-level and Subpixel `Makefile` stubs. No stock host compiler or GNU Make product fallback is supported. The checked entrypoint is `sh scripts/run-ike.sh test`, which demands pinned compiled Ike, an independently anchored executable digest and a fresh receipt path. The Android NDK gap lane is declared separately. Refer to [owned-toolchain qualification](subpixel/qualification/README.md).
 
 **Explicit stage-zero exceptions:** Building the GCC-derived ICK compiler still requires the system host C/C++ bootstrap toolchain and GNU Make; a declared system linker supplies Linux CRT/libc/libm after ICK generated the project and Ike objects. None of these stages compiles any consumer C source. This is not yet a self-hosting complete-toolchain claim.
 

@@ -1,7 +1,8 @@
+#!/usr/bin/env grease
 # Stable public-test update, using the maintained packager and the accepted
 # independent FP -> AICI APK gate. No key generation or fallback signer.
 set -o errexit -o nounset -o pipefail
-var root = "$(git rev-parse --show-toplevel)"
+var root = "$(dirname -- "$(dirname -- "$(realpath -- "$0")")")"
 var packager = ENV.ANDROID_NDK_REPO
 var policy = ENV.AICI_CHECKOUT
 var pipes = ENV.FP_CHECKOUT
@@ -16,7 +17,7 @@ setglobal ENV.ANDROID_MIN_SDK = '21'
 setglobal ENV.ANDROID_TARGET_SDK = '34'
 setglobal ENV.ANDROID_EXPECTED_LABEL = 'Rough Mathematical Art'
 setglobal ENV.ANDROID_EXPECTED_CERT_SHA256 = 'de9b1d47c5a65e6d46a204b79dd9ee566b9d3c9832ba81ebc4213d3392e92ff9'
-setglobal ENV.ANDROID_SOURCE_COMMIT = "$(git rev-parse HEAD)"
+setglobal ENV.ANDROID_SOURCE_COMMIT = "$(git -C "$root" rev-parse HEAD)"
 setglobal ENV.ANDROID_APP_ROOT = root
 setglobal ENV.ANDROID_NDK_CHECKOUT = packager
 for abi in armeabi-v7a arm64-v8a x86_64 {

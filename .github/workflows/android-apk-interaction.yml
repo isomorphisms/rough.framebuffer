@@ -131,6 +131,7 @@ jobs:
             build/android/roughart-*.apk
             build/android/*.receipt.tsv
             build/android/*/elf-*.txt
+            build/android/*/native-size.tsv
             build/android/emulator/
             build/android/fp-runs/
           include-hidden-files: true
