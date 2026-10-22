@@ -1,0 +1,9 @@
+C67 pinch-zoom test update
+Source: 98b3016d60db0eeccb971165b43d8dbdbbebfad2
+Package: org.isomorphisms.roughframebuffer
+VersionCode: 3
+ABI: arm64-v8a only
+APK SHA256: e9aa1926491f22d7f0884e4571ad05278f11bdfbd99f807d37665ed9ff344a25
+Certificate SHA256: de9b1d47c5a65e6d46a204b79dd9ee566b9d3c9832ba81ebc4213d3392e92ff9
+Qualification: https://github.com/isomorphisms/rough.framebuffer/actions/runs/39789775115
+Native gesture tests and NDK/package/emulator checks PASS. Physical C67 pinch NOT_RUN.
