@@ -109,6 +109,10 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/src/surface_aa.c" -o "$out/surface_aa.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/tests/test_surface_aa.c" -o "$out/test_surface_aa.o"
+"$ICK_CC" $flags -I"$repo_root/src" -I"$repo_root/subpixel/include" \
+    -c "$repo_root/src/subpixel_demo.c" -o "$out/subpixel_demo.o"
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/tests/test_subpixel_demo.c" -o "$out/test_subpixel_demo.o"
 
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
@@ -119,7 +123,8 @@ for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/surface.o" "$out/surface_main.o" "$out/test_surface.o" \
               "$out/present.o" "$out/touch.o" "$out/test_present.o" \
               "$out/test_touch.o" "$out/test_rotation_grab.o" \
-              "$out/surface_aa.o" "$out/test_surface_aa.o"; do
+              "$out/surface_aa.o" "$out/test_surface_aa.o" \
+              "$out/subpixel_demo.o" "$out/test_subpixel_demo.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
     readelf -h "$object" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
@@ -158,6 +163,9 @@ done
     "$out/test_rotation_grab.o" -lm -o "$out/test_rotation_grab"
 "$HOST_LINKER" "$out/surface_aa.o" "$out/surface.o" "$out/framebuffer.o" \
     "$out/test_surface_aa.o" -lm -o "$out/test_surface_aa"
+"$HOST_LINKER" "$out/subpixel_demo.o" "$out/test_subpixel_demo.o" \
+    "$out/curve_patch.o" "$out/curve_patch_5x5.o" -lm \
+    -o "$out/test_subpixel_demo"
 
 echo "ICK source: $ick_pin"
 echo "ICK compiler: $ICK_CC"
@@ -189,6 +197,7 @@ sha256sum "$out/font-5x7-subpixels.txt"
 "$out/test_present"
 "$out/test_rotation_grab"
 "$out/test_surface_aa"
+"$out/test_subpixel_demo"
 # Kill old center-sample silhouette: the real AA oracle must notice the
 # foreground/intermediate coverage missing when 2x2 resolve is bypassed.
 sed 's/return rough_resolve_2x2(scratch, destination);/return rough_draw_surface(destination, shape, angle_degrees, camera_distance);/' \

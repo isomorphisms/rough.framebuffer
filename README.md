@@ -239,3 +239,13 @@ depth at four samples per software pixel before resolving in premultiplied
 alpha, with caller-owned scratch. Its ICK/Ike native tests reject the original
 single-center-sample approximation. Android frame timing, physical screen
 quality and smooth normals remain separate qualifications.
+
+## Visual 3×3 versus 5×5 Subpixel diagnostic
+
+The preserved native diagnostic draws the **same oblique curve** in quadratic
+3×3 and cubic 5×5 occupancy neighborhoods, without substituting this fixture
+for genuine 3D triangle antialiasing. Its exact integer-rational 8×8 coverage,
+colors, padding, clipping and deterministic rerender assertions run under ICK
+and the maintained Ike test route. The test-only Android overlay is source
+only until packaging and A1/C67 validation are repeated. No duplicate
+Subpixel library or GNU Make build is imported from the old Android branch.

@@ -39,3 +39,12 @@ release artifact; the actual shell still requires separately qualified NDK
 packaging. The ICK host tests check fractional edges, overlapping depths,
 transparent fringe, invalid/padded input and a deliberately bad single-sample
 implementation. Smooth normal shading remains a separate downstream draft.
+
+## Curvature visual diagnostic
+
+The renamed Subpixel native overlay displays an actual tilted quadratic
+versus cubic sampled mask; the historical spelling is not a supported API.
+Its C source, bitmap output and integer-rational sample-count oracle are
+integrated with the existing owned ICK host code. This overlay is **not**
+the 3D surface silhouette antialiaser; C67 package/device output remains
+unverified on the current merged branch.
