@@ -1,131 +1,82 @@
-/* Object-in-hand drag semantics for the current positive-z-into-screen
- * perspective and torus geometry. Do not replace this with a "hash changed"
- * test: the original implementation rendered changing pictures while moving
- * the BACK hemisphere in the drag direction.
- *
- * This oracle derives the movement of two *actual torus surface points* at
- * u = pi/2 and v = +/-pi/2 from the independently documented camera geometry:
- * x_world=0, y_world=1.18, z_world=+/-0.43. The negative-z point is nearer.
- */
+/* Independent quaternion sandwich oracle for actual torus landmarks.
+ * Production uses a derived matrix; this test multiplies pure imaginary
+ * quaternions explicitly before perspective division. */
 #include "touch.h"
-#include "framebuffer.h"
-
 #include <math.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <string.h>
 
-#define SCREEN_W 160u
-#define SCREEN_H 160u
-
+typedef struct { double w,x,y,z; } oracle_quaternion;
+static oracle_quaternion multiply(oracle_quaternion a, oracle_quaternion b) {
+    return (oracle_quaternion){a.w*b.w-a.x*b.x-a.y*b.y-a.z*b.z,
+        a.w*b.x+a.x*b.w+a.y*b.z-a.z*b.y,
+        a.w*b.y-a.x*b.z+a.y*b.w+a.z*b.x,
+        a.w*b.z+a.x*b.y-a.y*b.x+a.z*b.w};
+}
+static double landmark(rough_rotation rotation, double z, int vertical) {
+    oracle_quaternion q={rotation.w,rotation.x,rotation.y,rotation.z};
+    oracle_quaternion conjugate={q.w,-q.x,-q.y,-q.z};
+    const double diagonal=1.18/sqrt(2.0);
+    oracle_quaternion result=multiply(multiply(q,(oracle_quaternion){0,diagonal,diagonal,z}),conjugate);
+    return (vertical ? result.y : result.x)/(5.2+result.z);
+}
 static int wrong(const char *reason) {
-    fprintf(stderr, "FRONT_HEMISPHERE_WRONG_DIRECTION: %s\n", reason);
+    fprintf(stderr,"FRONT_HEMISPHERE_WRONG_DIRECTION: %s\n",reason);
     return 1;
 }
 #define REQUIRE(test, reason) do { if (!(test)) return wrong(reason); } while (0)
 
-static double torus_landmark_x(double yaw_deg, double z_world,
-                                unsigned width, unsigned height) {
-    const double pi = 3.14159265358979323846264338327950288;
-    double radians = yaw_deg * pi / 180.0;
-    double z_camera = 5.2 + sin(0.42) * 1.18 +
-                      cos(0.42) * cos(radians) * z_world;
-    double focal = 0.88 * (double)(width < height ? width : height);
-    return ((double)width - 1.0) / 2.0 +
-           focal * sin(radians) * z_world / z_camera;
-}
-
-static uint64_t frame_hash(const rough_touch_state *state) {
-    uint32_t pixels[SCREEN_W * SCREEN_H];
-    float depth[SCREEN_W * SCREEN_H];
-    for (unsigned i = 0; i < SCREEN_W * SCREEN_H; ++i) {
-        pixels[i] = 0xffffffffu;
-        depth[i] = INFINITY;
-    }
-    rough_framebuffer frame = {pixels, SCREEN_W, SCREEN_H, SCREEN_W,
-                               depth, SCREEN_W};
-    if (rough_draw_surface(&frame, state->shape, state->yaw_degrees,
-                           state->camera_distance) != 0) return 0;
-    uint64_t hash = UINT64_C(14695981039346656037);
-    unsigned foreground = 0;
-    for (unsigned i = 0; i < SCREEN_W * SCREEN_H; ++i) {
-        hash ^= (uint64_t)pixels[i];
-        hash *= UINT64_C(1099511628211);
-        if (pixels[i] != 0xffffffffu) ++foreground;
-    }
-    return foreground > 100u ? hash : 0;
-}
-
-static int test_direction(unsigned width, unsigned height,
-                          double initial_yaw, double dx, int id) {
-    rough_touch_state state;
-    REQUIRE(rough_touch_init(&state, width, height) == 0,
-            "could not initialize aspect ratio");
-    state.yaw_degrees = initial_yaw;
-
-    double start_near = torus_landmark_x(initial_yaw, -0.43, width, height);
-    double start_far = torus_landmark_x(initial_yaw, 0.43, width, height);
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_DOWN, id, 70.0, 70.0) == 0,
-            "down rejected");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_MOVE, id,
-                               70.0 + dx, 70.0) == 1,
-            "drag had no visible state change");
-    double finish_near = torus_landmark_x(state.yaw_degrees, -0.43,
-                                          width, height);
-    double finish_far = torus_landmark_x(state.yaw_degrees, 0.43,
-                                         width, height);
-    if (dx > 0.0) {
-        REQUIRE(finish_near > start_near + 0.1,
-                "right drag moves NEAR torus surface left");
-        REQUIRE(finish_far < start_far - 0.1,
-                "right drag moves FAR torus surface right");
-    } else {
-        REQUIRE(finish_near < start_near - 0.1,
-                "left drag moves NEAR torus surface right");
-        REQUIRE(finish_far > start_far + 0.1,
-                "left drag moves FAR torus surface left");
-    }
-    REQUIRE(frame_hash(&state) != 0, "rotation has no renderable surface");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_UP, id,
-                               70.0 + dx, 70.0) == 0,
-            "unexpected touch-up side effect");
-    return 0;
-}
-
 int main(void) {
-    /* Actual screen sides must follow the finger at two aspect ratios
-     * and at nonzero orientation, not just at the old symmetric pose. */
-    if (test_direction(160, 160, 0.0, 40.0, 3)) return 1;
-    if (test_direction(160, 160, 0.0, -40.0, 3)) return 1;
-    if (test_direction(160, 320, 25.0, 35.0, 9)) return 1;
-    if (test_direction(320, 160, 25.0, -70.0, 9)) return 1;
-
-    /* A second pointer must not affect the first owner's orientation.
-     * A cancellation must undo the current gesture. Vertical drag is zoom,
-     * and must not silently reverse or advance the yaw. */
-    rough_touch_state state;
-    REQUIRE(rough_touch_init(&state, 160, 320) == 0, "bad init");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_DOWN, 1, 30, 60) == 0,
-            "bad primary down");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_MOVE, 2, 120, 60) == 0,
-            "untracked pointer rotated object");
-    REQUIRE(state.yaw_degrees == 0.0, "secondary pointer changed yaw");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_MOVE, 1, 70, 60) == 1,
-            "primary drag ignored");
-    REQUIRE(state.yaw_degrees > 270.0 && state.yaw_degrees < 360.0,
-            "yaw did not rotate by front-grab sign");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_CANCEL, 1, 70, 60) == 1,
-            "cancel did not restore original pose");
-    REQUIRE(state.yaw_degrees == 0.0, "cancel retained rotation");
-
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_DOWN, 1, 30, 60) == 0,
-            "zoom down failed");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_MOVE, 1, 30, 90) == 1,
-            "vertical drag did not zoom");
-    REQUIRE(state.yaw_degrees == 0.0 && state.camera_distance > 5.2,
-            "vertical drag incorrectly rotated");
-    REQUIRE(rough_touch_apply(&state, ROUGH_TOUCH_UP, 1, 30, 90) == 0,
-            "zoom up failed");
-    puts("FRONT_HEMISPHERE_GRAB_PASS: near follows finger, back opposes");
+    const double pi=3.14159265358979323846;
+    for (unsigned vertical=0;vertical<2;++vertical)
+        for (int direction=-1;direction<=1;direction+=2)
+            for (unsigned previous_roll=0;previous_roll<2;++previous_roll) {
+                rough_touch_state state;
+                REQUIRE(rough_touch_init(&state,160,320)==0,"init");
+                double roll=previous_roll*pi/18;
+                state.orientation=(rough_rotation){cos(roll/2),0,0,sin(roll/2)};
+                rough_rotation initial=state.orientation;
+                double near_start=landmark(initial,-.43,(int)vertical);
+                double far_start=landmark(initial,.43,(int)vertical);
+                double dx=vertical ? 0 : direction*20;
+                double dy=vertical ? direction*40 : 0;
+                REQUIRE(rough_touch_apply(&state,ROUGH_TOUCH_DOWN,19,60,80)==0,"down");
+                REQUIRE(rough_touch_apply(&state,ROUGH_TOUCH_MOVE,19,60+dx,80+dy)==1,"drag inert");
+                double near_move=landmark(state.orientation,-.43,(int)vertical)-near_start;
+                double far_move=landmark(state.orientation,.43,(int)vertical)-far_start;
+                REQUIRE(direction*near_move>0.001,"near surface opposes finger");
+                REQUIRE(direction*far_move<-.001,"far surface follows finger");
+                REQUIRE(state.camera_distance==5.2,"one-finger drag zoomed");
+                double norm=state.orientation.w*state.orientation.w+state.orientation.x*state.orientation.x+
+                    state.orientation.y*state.orientation.y+state.orientation.z*state.orientation.z;
+                REQUIRE(fabs(norm-1)<1e-12,"rotation not unit length");
+                REQUIRE(rough_touch_apply(&state,ROUGH_TOUCH_CANCEL,19,60+dx,80+dy)==1,"cancel inert");
+                REQUIRE(memcmp(&state.orientation,&initial,sizeof initial)==0,"cancel lost orientation");
+            }
+    rough_rotation identity={1,0,0,0}, horizontal, vertical, first, second;
+    REQUIRE(rough_rotation_drag(identity,pi/2,0,&horizontal)==0,"horizontal delta");
+    REQUIRE(rough_rotation_drag(identity,0,pi/2,&vertical)==0,"vertical delta");
+    REQUIRE(rough_rotation_drag(horizontal,0,pi/2,&first)==0,"composition");
+    REQUIRE(rough_rotation_drag(vertical,pi/2,0,&second)==0,"reverse composition");
+    REQUIRE(fabs(first.z-second.z)>.5,"orthogonal rotations incorrectly commute");
+    /* Rendering's matrix must agree with this independent sandwich. */
+    double matrix[9];
+    REQUIRE(rough_rotation_matrix(first,matrix)==0,"matrix conversion");
+    double diagonal=1.18/sqrt(2.0);
+    double x=matrix[0]*diagonal+matrix[1]*diagonal-matrix[2]*.43;
+    double y=matrix[3]*diagonal+matrix[4]*diagonal-matrix[5]*.43;
+    double z=matrix[6]*diagonal+matrix[7]*diagonal-matrix[8]*.43;
+    REQUIRE(fabs(x/(5.2+z)-landmark(first,-.43,0))<1e-12,"matrix horizontal mismatch");
+    REQUIRE(fabs(y/(5.2+z)-landmark(first,-.43,1))<1e-12,"matrix vertical mismatch");
+    rough_rotation opposite={-first.w,-first.x,-first.y,-first.z};
+    double same[9];
+    REQUIRE(rough_rotation_matrix(opposite,same)==0,"opposite quaternion");
+    for(unsigned i=0;i<9;++i) REQUIRE(fabs(same[i]-matrix[i])<1e-12,"q/-q mismatch");
+    REQUIRE(rough_rotation_matrix((rough_rotation){0,0,0,0},same)==-1,"zero quaternion admitted");
+    REQUIRE(rough_rotation_matrix((rough_rotation){NAN,0,0,0},same)==-1,"NaN quaternion admitted");
+    for(unsigned i=0;i<10000;++i)
+        REQUIRE(rough_rotation_drag(first,.003,-.002,&first)==0,"repeated composition");
+    REQUIRE(fabs(first.w*first.w+first.x*first.x+first.y*first.y+first.z*first.z-1)<1e-12,"unit drift");
+    puts("FRONT_HEMISPHERE_GRAB_PASS: both screen axes; unit quaternion composition");
     return 0;
 }

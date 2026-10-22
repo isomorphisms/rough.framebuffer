@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "framebuffer.h"
+#include "rotation.h"
 
 /* Mathematical sampling is a source of the existing framebuffer P/T operation
  * stream, not a second renderer. A positive camera z points into the scene.
@@ -38,6 +39,15 @@ int rough_draw_surface(rough_framebuffer *target, rough_surface_shape shape,
 int rough_draw_surface_smooth(rough_framebuffer *target,
                               rough_surface_shape shape,
                               double degrees, double camera_distance);
+
+/* Quaternion model-to-camera orientation, including the initial pose.
+ * Positions and analytic normals use the same derived rotation matrix. */
+int rough_draw_surface_rotated(rough_framebuffer *target,
+                              rough_surface_shape shape,
+                              rough_rotation orientation, double distance);
+int rough_draw_surface_smooth_rotated(rough_framebuffer *target,
+                              rough_surface_shape shape,
+                              rough_rotation orientation, double distance);
 
 /* Model-space analytic unit normal on the parameterized surface, independent
  * of triangulation and the Android camera. Useful for independently testing

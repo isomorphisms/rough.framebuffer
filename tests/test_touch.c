@@ -21,7 +21,7 @@ static uint64_t render_frame(const rough_touch_state *state, unsigned *painted) 
         depth[i] = INFINITY;
     }
     rough_framebuffer fb = {pixels, WIDTH, HEIGHT, WIDTH, depth, WIDTH};
-    assert(rough_draw_surface(&fb, state->shape, state->yaw_degrees,
+    assert(rough_draw_surface_rotated(&fb, state->shape, state->orientation,
                               state->camera_distance) == 0);
     *painted = 0u;
     uint64_t checksum = UINT64_C(14695981039346656037);
@@ -45,6 +45,7 @@ int main(void) {
     assert(rough_touch_init(&touch, 0, HEIGHT) == -1);
     assert(rough_touch_init(&touch, WIDTH, HEIGHT) == 0);
     assert(touch.shape == ROUGH_SURFACE_TORUS && touch.camera_distance == 5.2);
+    rough_rotation initial_orientation = touch.orientation;
     unsigned painted;
     uint64_t initial = render_frame(&touch, &painted);
 
@@ -54,17 +55,17 @@ int main(void) {
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 8, 90, 40) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_UP, 8, 90, 40) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 7, 25, 40) == 0);
-    assert(touch.yaw_degrees == 0.0); /* deadzone prevents accidental rotation */
+    assert(memcmp(&touch.orientation, &initial_orientation, sizeof initial_orientation) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 7, 60, 40) == 1);
     /* Camera +z points inward: right drag must grab the near half.
      * The old +45 assertion encoded the exact inverted-hand bug. */
-    assert(fabs(touch.yaw_degrees - 315.0) < 1e-12);
+    assert(fabs(touch.orientation.y + sin(3.14159265358979323846/8)*cos(.21)) < 1e-12);
     uint64_t rotated = render_frame(&touch, &painted);
     assert(rotated != initial && painted > 100u);
 
     /* Cancelling the only active pointer restores the exact original frame. */
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_CANCEL, 7, 60, 40) == 1);
-    assert(touch.active == 0 && touch.yaw_degrees == 0.0);
+    assert(touch.active == 0 && memcmp(&touch.orientation, &initial_orientation, sizeof initial_orientation) == 0);
     assert(render_frame(&touch, &painted) == initial);
 
     /* A tap changes the mathematical shape, not just a UI log variable. */
@@ -78,13 +79,14 @@ int main(void) {
     assert(touch.shape == ROUGH_SURFACE_TORUS);
     assert(render_frame(&touch, &painted) == initial);
 
-    /* Vertical movement changes the camera; distance remains bounded. */
+    /* Vertical movement rotates, without changing camera distance. */
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 1, 20, 20) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 1, 20, 80) == 1);
-    assert(fabs(touch.camera_distance - 6.325) < 1e-12);
+    assert(touch.camera_distance == 5.2);
+    assert(memcmp(&touch.orientation, &initial_orientation, sizeof initial_orientation) != 0);
     assert(render_frame(&touch, &painted) != initial);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 1, 20, 20000) == 1);
-    assert(touch.camera_distance == 12.0);
+    assert(touch.camera_distance == 5.2);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_UP, 1, 20, 20000) == 0);
     assert(touch.active == 0);
 
@@ -92,7 +94,7 @@ int main(void) {
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 1, 20, 40) == 0);
     assert(rough_touch_resize(&touch, 0, HEIGHT) == -1);
     assert(rough_touch_resize(&touch, 240, 320) == 0);
-    assert(touch.active == 0 && touch.camera_distance == 12.0);
+    assert(touch.active == 0 && touch.camera_distance == 5.2);
 
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, 0, NAN, 0) == -1);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_DOWN, -1, 0, 0) == -1);
@@ -109,7 +111,7 @@ int main(void) {
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 4, 150, 150) == 0);
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 120, 80) == 1);
     assert(fabs(touch.camera_distance - 2.6) < 1e-12);
-    assert(touch.yaw_degrees == 0.0 && touch.shape == ROUGH_SURFACE_TORUS);
+    assert(memcmp(&touch.orientation, &initial_orientation, sizeof initial_orientation) == 0 && touch.shape == ROUGH_SURFACE_TORUS);
     assert(render_frame(&touch, &painted) != initial);
     /* Pinching together zooms out, with upper/lower and zero-span bounds. */
     assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE, 93, 60, 80) == 1);
@@ -129,7 +131,7 @@ int main(void) {
                                 primary_lifts ? 17 : 93, 40, 80) == 0);
         assert(rough_touch_apply(&touch, ROUGH_TOUCH_MOVE,
                                 primary_lifts ? 93 : 17, 140, 10) == 0);
-        assert(touch.shape == ROUGH_SURFACE_TORUS && touch.yaw_degrees == 0.0);
+        assert(touch.shape == ROUGH_SURFACE_TORUS && memcmp(&touch.orientation, &initial_orientation, sizeof initial_orientation) == 0);
         assert(!touch.active && !touch.pinching);
     }
     /* Both fingers moving uses their separation, independent of IDs. */

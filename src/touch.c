@@ -15,12 +15,6 @@ static double bounded(double value, double minimum, double maximum) {
     return value;
 }
 
-static double normalized_angle(double degrees) {
-    double angle = fmod(degrees, 360.0);
-    if (angle < 0.0) angle += 360.0;
-    return angle;
-}
-
 static int dimensions_ok(unsigned width, unsigned height) {
     return width > 0 && width <= TOUCH_MAX_DIMENSION &&
            height > 0 && height <= TOUCH_MAX_DIMENSION;
@@ -33,6 +27,7 @@ int rough_touch_init(rough_touch_state *state, unsigned width, unsigned height) 
     state->height = height;
     state->shape = ROUGH_SURFACE_TORUS;
     state->camera_distance = 5.2;
+    state->orientation = (rough_rotation){cos(0.21), sin(0.21), 0.0, 0.0};
     state->active_pointer_id = -1;
     state->secondary_pointer_id = -1;
     return 0;
@@ -81,7 +76,7 @@ int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
         state->pointer_y = y;
         state->pinching = 0;
         state->secondary_pointer_id = -1;
-        state->anchor_yaw = state->yaw_degrees;
+        state->anchor_orientation = state->orientation;
         state->anchor_distance = state->camera_distance;
         return 0;
     }
@@ -89,9 +84,10 @@ int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
         (!state->pinching || state->secondary_pointer_id != pointer_id))) return 0;
 
     if (event == ROUGH_TOUCH_CANCEL) {
-        int changed = (state->yaw_degrees != state->anchor_yaw ||
+        int changed = (memcmp(&state->orientation, &state->anchor_orientation,
+                              sizeof state->orientation) != 0 ||
                        state->camera_distance != state->anchor_distance);
-        state->yaw_degrees = state->anchor_yaw;
+        state->orientation = state->anchor_orientation;
         state->camera_distance = state->anchor_distance;
         state->active = 0;
         state->active_pointer_id = -1;
@@ -146,16 +142,12 @@ int rough_touch_apply(rough_touch_state *state, rough_touch_event event,
          * A right drag must move that near half right, so yaw decreases.
          * Do not use camera-orbit sign here; it turns the far half instead.
          * Cross-viewer defect class: ai-ci #252. */
-        double angle = normalized_angle(state->anchor_yaw -
-                        dx * (180.0 / (double)state->width));
-        double distance = bounded(state->anchor_distance +
-                          dy * (3.0 / (double)state->height),
-                          TOUCH_MIN_CAMERA_DISTANCE, TOUCH_MAX_CAMERA_DISTANCE);
-        if (!isfinite(angle) || !isfinite(distance)) return -1;
-        changed = angle != state->yaw_degrees ||
-                  distance != state->camera_distance;
-        state->yaw_degrees = angle;
-        state->camera_distance = distance;
+        const double pi = 3.14159265358979323846;
+        rough_rotation next;
+        if (rough_rotation_drag(state->anchor_orientation,
+                dx * (pi / state->width), dy * (pi / state->height), &next)) return -1;
+        changed = memcmp(&next, &state->orientation, sizeof next) != 0;
+        state->orientation = next;
     }
 
     if (event == ROUGH_TOUCH_UP) {

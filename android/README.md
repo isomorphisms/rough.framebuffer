@@ -1,5 +1,16 @@
 # NativeActivity source retained from the original Android art draft
 
+## Gestures and orientation
+
+One-finger horizontal and vertical swipes compose screen-axis rotations into
+a normalized scalar-first quaternion. The gesture state stores this quaternion
+and its cancellation anchor, with no Euler-angle state. Geometry and analytic
+normals share a matrix derived from that orientation once per frame. The old
+angle-based headless stream remains a compatibility interface.
+
+Pinch alone changes camera distance. Spreading zooms in; bringing fingers
+together zooms out. A pinch never switches shapes. Taps still toggle shapes.
+
 ## Reproducible current-head test packaging
 
 `build-ndk.grease` replaces the retired Android Makefile. It uses only the
@@ -14,7 +25,7 @@ source directory instead of relying on the caller's current directory.
 
 `package-test.grease` uses the maintained android-NDK packager, preserves
 `org.isomorphisms.roughframebuffer` and the central public-test certificate,
-and uses versionCode 3 for the pinch-zoom update. The digest-bound historical artifact
+and uses versionCode 4 for the quaternion-rotation update. The digest-bound historical artifact
 is used solely for update identity comparison, not source qualification.
 Every finished single-ABI package goes through Flexible Pipes'
 `android-apk-preflight` and its accepted independent AI-CI producer gate.

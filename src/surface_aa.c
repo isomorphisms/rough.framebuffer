@@ -118,15 +118,18 @@ int rough_resolve_2x2(const rough_framebuffer *samples,
     return 0;
 }
 
-int rough_draw_surface_aa2(rough_framebuffer *destination,
+static int draw_sampled(rough_framebuffer *destination,
                            rough_framebuffer *scratch,
                            rough_surface_shape shape,
                            double angle_degrees,
-                           double camera_distance) {
+                           double camera_distance,
+                           const rough_rotation *orientation) {
     if (!valid_pair(scratch, destination) ||
         !isfinite(angle_degrees) || !isfinite(camera_distance) ||
         (shape != ROUGH_SURFACE_TORUS &&
          shape != ROUGH_SURFACE_ENNEPER)) return -1;
+    double matrix[9];
+    if (orientation && rough_rotation_matrix(*orientation, matrix)) return -1;
 
     /* Scratch is caller-owned and reusable across frames. Each subpixel
      * retains an independent depth test until the entire frame is resolved.
@@ -140,7 +143,22 @@ int rough_draw_surface_aa2(rough_framebuffer *destination,
         }
     }
 
-    if (rough_draw_surface_smooth(scratch, shape, angle_degrees, camera_distance))
+    int result = orientation ?
+        rough_draw_surface_smooth_rotated(scratch, shape, *orientation, camera_distance) :
+        rough_draw_surface_smooth(scratch, shape, angle_degrees, camera_distance);
+    if (result)
         return -1;
     return rough_resolve_2x2(scratch, destination);
+}
+
+int rough_draw_surface_aa2(rough_framebuffer *destination,
+                    rough_framebuffer *scratch, rough_surface_shape shape,
+                    double degrees, double distance) {
+    return draw_sampled(destination, scratch, shape, degrees, distance, NULL);
+}
+
+int rough_draw_surface_aa2_rotated(rough_framebuffer *destination,
+                    rough_framebuffer *scratch, rough_surface_shape shape,
+                    rough_rotation orientation, double distance) {
+    return draw_sampled(destination, scratch, shape, 0.0, distance, &orientation);
 }

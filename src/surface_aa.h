@@ -35,4 +35,9 @@ int rough_draw_surface_aa2(rough_framebuffer *destination,
                            double angle_degrees,
                            double camera_distance);
 
+int rough_draw_surface_aa2_rotated(rough_framebuffer *destination,
+                                  rough_framebuffer *scratch,
+                                  rough_surface_shape shape,
+                                  rough_rotation orientation, double distance);
+
 #endif
