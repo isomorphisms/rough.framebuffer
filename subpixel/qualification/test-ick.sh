@@ -105,6 +105,10 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/tests/test_touch.c" -o "$out/test_touch.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/tests/test_rotation_grab.c" -o "$out/test_rotation_grab.o"
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/src/surface_aa.c" -o "$out/surface_aa.o"
+"$ICK_CC" $flags -I"$repo_root/src" -c \
+    "$repo_root/tests/test_surface_aa.c" -o "$out/test_surface_aa.o"
 
 for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/curve_patch_5x5.o" "$out/test_curve_patch_5x5.o" \
@@ -114,7 +118,8 @@ for object in "$out/curve_patch.o" "$out/test_curve_patch.o" \
               "$out/framebuffer.o" "$out/rough_main.o" "$out/test_raster_ick.o" "$out/test_api.o" \
               "$out/surface.o" "$out/surface_main.o" "$out/test_surface.o" \
               "$out/present.o" "$out/touch.o" "$out/test_present.o" \
-              "$out/test_touch.o" "$out/test_rotation_grab.o"; do
+              "$out/test_touch.o" "$out/test_rotation_grab.o" \
+              "$out/surface_aa.o" "$out/test_surface_aa.o"; do
     test -s "$object"
     readelf -h "$object" | grep -q 'Class:.*ELF64'
     readelf -h "$object" | grep -q 'Machine:.*Advanced Micro Devices X86-64'
@@ -151,6 +156,8 @@ done
     "$out/test_touch.o" -lm -o "$out/test_touch"
 "$HOST_LINKER" "$out/touch.o" "$out/surface.o" "$out/framebuffer.o" \
     "$out/test_rotation_grab.o" -lm -o "$out/test_rotation_grab"
+"$HOST_LINKER" "$out/surface_aa.o" "$out/surface.o" "$out/framebuffer.o" \
+    "$out/test_surface_aa.o" -lm -o "$out/test_surface_aa"
 
 echo "ICK source: $ick_pin"
 echo "ICK compiler: $ICK_CC"
@@ -181,6 +188,24 @@ sha256sum "$out/font-5x7-subpixels.txt"
 "$out/test_touch"
 "$out/test_present"
 "$out/test_rotation_grab"
+"$out/test_surface_aa"
+# Kill old center-sample silhouette: the real AA oracle must notice the
+# foreground/intermediate coverage missing when 2x2 resolve is bypassed.
+sed 's/return rough_resolve_2x2(scratch, destination);/return rough_draw_surface(destination, shape, angle_degrees, camera_distance);/' \
+    "$repo_root/src/surface_aa.c" > "$out/aa-single-sample-mutant.c"
+grep -Fq 'return rough_draw_surface(destination, shape, angle_degrees, camera_distance);' \
+    "$out/aa-single-sample-mutant.c"
+"$ICK_CC" $flags -I"$repo_root/src" -c "$out/aa-single-sample-mutant.c" \
+    -o "$out/aa-single-sample-mutant.o"
+"$HOST_LINKER" "$out/aa-single-sample-mutant.o" "$out/surface.o" \
+    "$out/framebuffer.o" "$out/test_surface_aa.o" -lm \
+    -o "$out/reject-1x-silhouette"
+ulimit -c 0
+if "$out/reject-1x-silhouette" > "$out/reject-1x-silhouette.log" 2>&1; then
+    echo 'Single-sample triangle silhouette incorrectly accepted' >&2; exit 1
+fi
+grep -Fq 'changed > 20u' "$out/reject-1x-silhouette.log"
+echo 'ICK depth-correct 2x2 subpixel silhouette and 1x mutant: PASS'
 # Independently reject reversed near-side drag semantics; changed frame hashes
 # alone falsely accepted the original defect. Compile the mutant with ICK too.
 sed 's/state->anchor_yaw -/state->anchor_yaw +/' \

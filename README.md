@@ -231,3 +231,11 @@ Android consumers. Actual A1/C67 packaging remains with the maintained
 android-NDK, Kitchen and Cat Food boundaries; current source admission does not
 claim a new APK, real device run or signer acceptance. See
 [Android source scope](android/README.md).
+
+## Depth-aware 2×2 antialiasing source
+
+The retained native `rough_draw_surface_aa2` independently tests color and
+depth at four samples per software pixel before resolving in premultiplied
+alpha, with caller-owned scratch. Its ICK/Ike native tests reject the original
+single-center-sample approximation. Android frame timing, physical screen
+quality and smooth normals remain separate qualifications.

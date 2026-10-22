@@ -28,3 +28,14 @@ gesture event delivery, lifecycle, stride and presentation only.
 Upstream mathematical curves/intersections remain with
 [walnut-burgundy/fulton](https://github.com/walnut-burgundy/fulton);
 this Android artifact merely paints and interacts with computed frames.
+
+## C67 2×2 depth-aware software sampling source
+
+The preserved C67/x86-64 code path uses four independently depth-tested
+color samples per logical framebuffer pixel and premultiplied-alpha resolve.
+ARM32 remains the original single-sample route. This is a source/API
+qualification, not a measured frame rate, physical pixel AA guarantee or
+release artifact; the actual shell still requires separately qualified NDK
+packaging. The ICK host tests check fractional edges, overlapping depths,
+transparent fringe, invalid/padded input and a deliberately bad single-sample
+implementation. Smooth normal shading remains a separate downstream draft.
