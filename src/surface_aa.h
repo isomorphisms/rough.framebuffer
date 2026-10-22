@@ -19,13 +19,15 @@ int rough_resolve_2x2(const rough_framebuffer *samples,
 /* The scratch image must be exactly twice the destination dimensions,
  * with independent depth for each of the four subpixels per destination
  * pixel. The scratch is cleared to opaque white and +infinity depth on every
- * call. The same native rough_draw_surface() renders at the high resolution,
- * then rough_resolve_2x2() resolves into the caller's existing framebuffer.
+ * call. rough_draw_surface_smooth() renders into the high-resolution sample
+ * grid with continuous analytic normals and perspective-correct per-fragment
+ * diffuse lighting. rough_resolve_2x2() then resolves those pixels into the
+ * caller's existing framebuffer.
  *
  * This is real 2x2 coverage at the software framebuffer's resolution;
  * a final scale-up to the Android window cannot create new geometry.
- * The first C67/A1 slice retains face-flat colors; smooth normals are a
- * separate unresolved part of rough.framebuffer issue #5.
+ * The old flat-shaded rough_draw_surface()/P-T stream remain available,
+ * and the 32-bit A1 consumer retains its faster single-sample mode.
  */
 int rough_draw_surface_aa2(rough_framebuffer *destination,
                            rough_framebuffer *scratch,
