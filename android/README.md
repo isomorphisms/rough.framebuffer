@@ -11,6 +11,9 @@ angle-based headless stream remains a compatibility interface.
 Pinch alone changes camera distance. Spreading zooms in; bringing fingers
 together zooms out. A pinch never switches shapes. Taps still toggle shapes.
 
+Version 0.5 corrects the vertical drag sign: input y points downward while
+camera y projects upward. The near surface follows the finger on both axes.
+
 ## Reproducible current-head test packaging
 
 `build-ndk.grease` replaces the retired Android Makefile. It uses only the
@@ -25,7 +28,7 @@ source directory instead of relying on the caller's current directory.
 
 `package-test.grease` uses the maintained android-NDK packager, preserves
 `org.isomorphisms.roughframebuffer` and the central public-test certificate,
-and uses versionCode 4 for the quaternion-rotation update. The digest-bound historical artifact
+and uses versionCode 5 for the vertical-rotation correction. The digest-bound historical artifact
 is used solely for update identity comparison, not source qualification.
 Every finished single-ABI package goes through Flexible Pipes'
 `android-apk-preflight` and its accepted independent AI-CI producer gate.

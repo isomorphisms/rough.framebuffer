@@ -32,7 +32,8 @@ static inline int rough_rotation_drag(rough_rotation anchor,
     if (!isfinite(angle)) return -1;
     if (angle == 0.0) return rough_rotation_normalize(anchor, result);
     double scale = sin(0.5 * angle) / angle;
-    rough_rotation delta = {cos(0.5 * angle), vertical*scale,
+    /* Input y increases downward; the renderer projects camera y upward. */
+    rough_rotation delta = {cos(0.5 * angle), -vertical*scale,
                              -horizontal*scale, 0.0};
     return rough_rotation_normalize(rough_rotation_product(delta, anchor), result);
 }

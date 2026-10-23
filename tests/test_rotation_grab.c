@@ -18,7 +18,9 @@ static double landmark(rough_rotation rotation, double z, int vertical) {
     oracle_quaternion conjugate={q.w,-q.x,-q.y,-q.z};
     const double diagonal=1.18/sqrt(2.0);
     oracle_quaternion result=multiply(multiply(q,(oracle_quaternion){0,diagonal,diagonal,z}),conjugate);
-    return (vertical ? result.y : result.x)/(5.2+result.z);
+    /* Match actual screen projection: screen y is minus camera y. The old
+     * oracle omitted this minus and accepted inverted vertical swipes. */
+    return (vertical ? -result.y : result.x)/(5.2+result.z);
 }
 static int wrong(const char *reason) {
     fprintf(stderr,"FRONT_HEMISPHERE_WRONG_DIRECTION: %s\n",reason);
@@ -67,7 +69,7 @@ int main(void) {
     double y=matrix[3]*diagonal+matrix[4]*diagonal-matrix[5]*.43;
     double z=matrix[6]*diagonal+matrix[7]*diagonal-matrix[8]*.43;
     REQUIRE(fabs(x/(5.2+z)-landmark(first,-.43,0))<1e-12,"matrix horizontal mismatch");
-    REQUIRE(fabs(y/(5.2+z)-landmark(first,-.43,1))<1e-12,"matrix vertical mismatch");
+    REQUIRE(fabs(-y/(5.2+z)-landmark(first,-.43,1))<1e-12,"matrix vertical mismatch");
     rough_rotation opposite={-first.w,-first.x,-first.y,-first.z};
     double same[9];
     REQUIRE(rough_rotation_matrix(opposite,same)==0,"opposite quaternion");
