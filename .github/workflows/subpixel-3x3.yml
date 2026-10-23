@@ -257,6 +257,8 @@ jobs:
             subpixel/build/*.ppm
             subpixel/build/*.tsv
             subpixel/build/ick/path.su
+            subpixel/build/ick/sensor-font.pgm
+            subpixel/build/ick/sensor-font.tsv
             build/comparison/*.ppm
           if-no-files-found: error
           retention-days: 14

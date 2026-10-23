@@ -187,7 +187,7 @@ int main(void) {
     const char names[] = {'O', 'C', 'S', '8'};
     for (unsigned index = 0; index < sizeof names; ++index)
         CHECK(test_glyph(names[index], index) == 0);
-    CHECK(sf57_find_glyph('0') == NULL);
+    CHECK(sf57_find_glyph(0x10ffff) == NULL);
     CHECK(sf57_bitmap_cell(sf57_find_glyph('O'), SF57_COLUMNS, 0) == -1);
     CHECK(test_invalid_is_atomic() == 0);
     puts("Subpixel 5x7 exact masks + continuous masters + 40x56 sampling: PASS");
