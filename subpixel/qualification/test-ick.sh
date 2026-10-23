@@ -80,6 +80,10 @@ flags="-O2 -std=c11 -Wall -Wextra -Werror -pedantic -ffp-contract=off -fno-fast-
     "$repo_root/subpixel/tests/test_font_5x7.c" -o "$out/test_font_5x7.o"
 "$ICK_CC" $flags -I"$repo_root/subpixel/examples" -c \
     "$repo_root/subpixel/examples/font_5x7_dump.c" -o "$out/font_5x7_dump.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/src/font.c" -o "$out/font.o"
+"$ICK_CC" $flags -I"$repo_root/subpixel/include" -c \
+    "$repo_root/subpixel/tests/test_font_render.c" -o "$out/test_font_render.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
     "$repo_root/src/framebuffer.c" -o "$out/framebuffer.o"
 "$ICK_CC" $flags -I"$repo_root/src" -c \
@@ -147,6 +151,9 @@ done
     -lm -o "$out/test_font_5x7"
 "$HOST_LINKER" "$out/font_5x7.o" "$out/font_5x7_dump.o" \
     -lm -o "$out/font_5x7_dump"
+"$HOST_LINKER" "$out/font.o" "$out/font_5x7.o" "$out/curve_patch.o" \
+    "$out/curve_patch_5x5.o" "$out/coverage_plane.o" "$out/path.o" \
+    "$out/test_font_render.o" -lm -o "$out/test_font_render"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/test_raster_ick.o" \
     -lm -o "$out/test_raster_ick"
 "$HOST_LINKER" "$out/framebuffer.o" "$out/test_api.o" \
@@ -192,6 +199,8 @@ sha256sum "$out/path.o" "$out/test_path.o" "$out/test_path" "$out/path.su"
 "$out/test_curve_patch_5x5"
 "$out/test_coverage_plane"
 "$out/test_font_5x7"
+"$out/test_font_render" "$out/sensor-font.pgm" > "$out/sensor-font.tsv"
+cat "$out/sensor-font.tsv"
 "$out/font_5x7_dump" > "$out/font-5x7-subpixels.txt"
 test -s "$out/font-5x7-subpixels.txt"
 sha256sum "$out/font-5x7-subpixels.txt"

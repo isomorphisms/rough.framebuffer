@@ -33,7 +33,7 @@ typedef struct {
 } sf57_subpath;
 
 typedef struct {
-    char name;
+    uint32_t name;
     const char *bitmap_rows[SF57_ROWS];
     const sf57_segment *segments;
     size_t segment_count;
@@ -48,7 +48,7 @@ typedef struct {
 /* The bitmap is an exact 35-cell reference. The curve master is independent:
  * ordered line/quadratic/cubic centerline geometry in [0,5] x [0,7], with
  * explicit stroke width and topology. It is not reconstructed from the bits. */
-const sf57_glyph *sf57_find_glyph(char name);
+const sf57_glyph *sf57_find_glyph(uint32_t name);
 int sf57_validate_glyph(const sf57_glyph *glyph);
 int sf57_bitmap_cell(const sf57_glyph *glyph, unsigned column, unsigned row);
 

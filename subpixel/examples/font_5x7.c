@@ -55,6 +55,9 @@ static const sf57_glyph glyphs[] = {
      glyph_8_segments, 8, glyph_8_paths, 2, 0.66, 6.0, 0.0, 6.5}
 };
 
+/* Directly authored instrument alphabet; never traced from bitmap cells. */
+#include "font_5x7_masters.inc"
+
 static int point_is_finite(sf57_point point) {
     return isfinite(point.x) && isfinite(point.y);
 }
@@ -74,9 +77,11 @@ static sf57_point segment_end(const sf57_segment *segment) {
     return segment->point[3];
 }
 
-const sf57_glyph *sf57_find_glyph(char name) {
+const sf57_glyph *sf57_find_glyph(uint32_t name) {
     for (size_t index = 0; index < sizeof glyphs / sizeof glyphs[0]; ++index)
         if (glyphs[index].name == name) return &glyphs[index];
+    for (size_t index = 0; index < sizeof sensor_glyphs / sizeof sensor_glyphs[0]; ++index)
+        if (sensor_glyphs[index].name == name) return &sensor_glyphs[index];
     return NULL;
 }
 
@@ -89,8 +94,8 @@ int sf57_validate_glyph(const sf57_glyph *glyph) {
         !isfinite(glyph->bearing_x) || !isfinite(glyph->baseline))
         return 0;
     for (unsigned row = 0; row < SF57_ROWS; ++row) {
-        if (!glyph->bitmap_rows[row] ||
-            strlen(glyph->bitmap_rows[row]) != (size_t)SF57_COLUMNS)
+        if (!glyph->bitmap_rows[row]) continue; /* Geometry-only master. */
+        if (strlen(glyph->bitmap_rows[row]) != (size_t)SF57_COLUMNS)
             return 0;
         for (unsigned column = 0; column < SF57_COLUMNS; ++column)
             if (glyph->bitmap_rows[row][column] != '.' &&
@@ -131,7 +136,7 @@ int sf57_validate_glyph(const sf57_glyph *glyph) {
 int sf57_bitmap_cell(const sf57_glyph *glyph, unsigned column, unsigned row) {
     if (!sf57_validate_glyph(glyph) || column >= SF57_COLUMNS || row >= SF57_ROWS)
         return -1;
-    return glyph->bitmap_rows[row][column] == '#';
+    return glyph->bitmap_rows[row] ? glyph->bitmap_rows[row][column] == '#' : -1;
 }
 
 static sf57_point evaluate(const sf57_segment *segment, double parameter) {
