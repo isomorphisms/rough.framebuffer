@@ -49,3 +49,41 @@ evidence remain attached to
 [the original draft](https://github.com/isomorphisms/rough.framebuffer/pull/3).
 The shared movie/capture subsystem remains WIGGLE-VIDEO-01 rather than
 copying a second FFmpeg pipeline into this repository.
+
+## Gesture-direction regression: 2026-10-22
+
+Two direction corrections were needed during C67 testing. The repeated mistake
+was checking an internal coordinate convention instead of the movement of the
+visible surface under the user's finger. Changing frame hashes proves movement,
+but cannot establish that its direction is correct.
+
+The v0.4 vertical defect survived a supposedly independent quaternion-sandwich
+test because that test omitted the renderer's inversion of the vertical axis.
+Camera y increases upward; Android touch y and framebuffer row numbers increase
+downward. Actual projection uses screen y = center y − focal × camera y ÷ camera z.
+The test incorrectly compared positive camera y with positive touch y, so code
+and oracle agreed on the same wrong assumption. After the earlier horizontal
+direction defect, both axes should have been checked through screen projection.
+
+The v0.5 correction reverses the vertical quaternion delta and makes the oracle
+apply the actual screen-y sign. Horizontal rotation and pinch zoom are retained;
+orientation remains a normalized quaternion. The corrected oracle passed with
+the fix and rejected genuinely compiled prior-sign source. The user then
+confirmed the corrected v0.5 behavior on the physical C67. This is user-reported
+gesture acceptance, not a measured frame-rate or device-wide performance claim.
+
+Future interaction changes must preserve these checks:
+
+- Follow actual near and far surface landmarks through orientation, perspective
+  division and screen projection. The visible near surface must follow the finger.
+- Exercise up, down, left and right after existing rotations, not only at the
+  identity pose. Keep screen axes distinct from model and camera axes.
+- Verify that one-finger rotation leaves camera distance unchanged and pinch
+  changes distance without rotating.
+- Require a direction oracle to reject the known reversed-sign behavior; a
+  changed image or a quaternion algebra identity alone is insufficient.
+
+The regression tests live in [test_rotation_grab.c](../tests/test_rotation_grab.c)
+and [test_touch.c](../tests/test_touch.c). This contract belongs at the geometry,
+projection and interaction boundary in this repository. NDK packaging cannot
+establish gesture direction.
