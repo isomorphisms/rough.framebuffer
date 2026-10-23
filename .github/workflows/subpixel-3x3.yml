@@ -2,6 +2,8 @@ name: Subpixel ICK compiler + Ike orchestrated C11 qualification
 on:
   pull_request:
     paths:
+      - 'src/**'
+      - 'tests/**'
       - 'subpixel/**'
       - 'Makefile'
       - 'Ikefile'

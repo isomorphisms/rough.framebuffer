@@ -53,7 +53,12 @@ static point3 sample_surface(rough_surface_shape shape, double u, double v) {
 /* Right-handed yaw around y, followed by fixed pitch around x. The camera
  * looks along positive z. The fixed pitch makes angle zero visibly three-
  * dimensional; a caller-controlled yaw supplies frame-to-frame rotation. */
-static point3 to_camera(point3 p, double sine, double cosine, double distance) {
+static point3 to_camera(point3 p, double sine, double cosine, double distance,
+                         const double *matrix) {
+    if (matrix) return (point3){
+        matrix[0]*p.x + matrix[1]*p.y + matrix[2]*p.z,
+        matrix[3]*p.x + matrix[4]*p.y + matrix[5]*p.z,
+        matrix[6]*p.x + matrix[7]*p.y + matrix[8]*p.z + distance};
     const double pitch = 0.42;
     double sx = sin(pitch);
     double cx = cos(pitch);
@@ -219,11 +224,12 @@ int rough_surface_unit_normal(rough_surface_shape shape,
 static smooth_camera_vertex smooth_corner(point3 camera,
                                           rough_surface_shape shape,
                                           double u, double v,
-                                          double sine, double cosine) {
+                                          double sine, double cosine,
+                                          const double *matrix) {
     point3 normal = analytic_unit_normal(shape, u, v);
     smooth_camera_vertex result;
     result.camera = camera;
-    result.normal = to_camera(normal, sine, cosine, 0.0);
+    result.normal = to_camera(normal, sine, cosine, 0.0, matrix);
     /* Integer-frequency torus harmonics identify both parameter seams. */
     double warm = 0.5 + 0.5 * sin(u);
     double cool = 0.5 + 0.5 * cos(2.0 * v);
@@ -318,7 +324,7 @@ static int emit_smooth_face(rough_framebuffer *target,
 static int walk_surface(FILE *output, rough_framebuffer *target,
                         rough_surface_shape shape, double degrees,
                         unsigned width, unsigned height, double camera_distance,
-                        int smooth) {
+                        int smooth, const rough_rotation *orientation) {
     if ((!output && (!target || !target->pixels || target->width != width ||
                       target->height != height)) ||
         (shape != ROUGH_SURFACE_TORUS && shape != ROUGH_SURFACE_ENNEPER) ||
@@ -332,6 +338,9 @@ static int walk_surface(FILE *output, rough_framebuffer *target,
     double yaw = fmod(degrees, 360.0) * (pi / 180.0);
     double sine = sin(yaw);
     double cosine = cos(yaw);
+    double rotation[9];
+    if (orientation && rough_rotation_matrix(*orientation, rotation)) return -1;
+    const double *matrix = orientation ? rotation : NULL;
     unsigned steps_u = shape == ROUGH_SURFACE_TORUS ? 56u : 48u;
     unsigned steps_v = shape == ROUGH_SURFACE_TORUS ? 28u : 48u;
 
@@ -355,10 +364,10 @@ static int walk_surface(FILE *output, rough_framebuffer *target,
             }
 
             point3 corners[4] = {
-                to_camera(sample_surface(shape, u0, v0), sine, cosine, camera_distance),
-                to_camera(sample_surface(shape, u1, v0), sine, cosine, camera_distance),
-                to_camera(sample_surface(shape, u1, v1), sine, cosine, camera_distance),
-                to_camera(sample_surface(shape, u0, v1), sine, cosine, camera_distance)
+                to_camera(sample_surface(shape, u0, v0), sine, cosine, camera_distance, matrix),
+                to_camera(sample_surface(shape, u1, v0), sine, cosine, camera_distance, matrix),
+                to_camera(sample_surface(shape, u1, v1), sine, cosine, camera_distance, matrix),
+                to_camera(sample_surface(shape, u0, v1), sine, cosine, camera_distance, matrix)
             };
             point3 first[3] = {corners[0], corners[1], corners[2]};
             point3 second[3] = {corners[0], corners[2], corners[3]};
@@ -366,10 +375,10 @@ static int walk_surface(FILE *output, rough_framebuffer *target,
                 /* Same four camera-space positions as the historical mesh,
                  * now with shared analytic normals/material at each corner. */
                 smooth_camera_vertex vertex[4] = {
-                    smooth_corner(corners[0], shape, u0, v0, sine, cosine),
-                    smooth_corner(corners[1], shape, u1, v0, sine, cosine),
-                    smooth_corner(corners[2], shape, u1, v1, sine, cosine),
-                    smooth_corner(corners[3], shape, u0, v1, sine, cosine)
+                    smooth_corner(corners[0], shape, u0, v0, sine, cosine, matrix),
+                    smooth_corner(corners[1], shape, u1, v0, sine, cosine, matrix),
+                    smooth_corner(corners[2], shape, u1, v1, sine, cosine, matrix),
+                    smooth_corner(corners[3], shape, u0, v1, sine, cosine, matrix)
                 };
                 smooth_camera_vertex first_smooth[3] = {
                     vertex[0], vertex[1], vertex[2]
@@ -395,14 +404,14 @@ int rough_emit_surface(FILE *output, rough_surface_shape shape, double degrees,
                        unsigned width, unsigned height, double camera_distance) {
     if (!output) return -1;
     return walk_surface(output, NULL, shape, degrees, width, height,
-                        camera_distance, 0);
+                        camera_distance, 0, NULL);
 }
 
 int rough_draw_surface(rough_framebuffer *target, rough_surface_shape shape,
                        double degrees, double camera_distance) {
     if (!target || !target->pixels) return -1;
     return walk_surface(NULL, target, shape, degrees,
-                        target->width, target->height, camera_distance, 0);
+                        target->width, target->height, camera_distance, 0, NULL);
 }
 
 int rough_draw_surface_smooth(rough_framebuffer *target,
@@ -410,5 +419,19 @@ int rough_draw_surface_smooth(rough_framebuffer *target,
                               double degrees, double camera_distance) {
     if (!target || !target->pixels || !target->depth) return -1;
     return walk_surface(NULL, target, shape, degrees,
-                        target->width, target->height, camera_distance, 1);
+                        target->width, target->height, camera_distance, 1, NULL);
+}
+
+int rough_draw_surface_rotated(rough_framebuffer *target, rough_surface_shape shape,
+                               rough_rotation orientation, double distance) {
+    if (!target || !target->pixels) return -1;
+    return walk_surface(NULL, target, shape, 0.0, target->width, target->height,
+                        distance, 0, &orientation);
+}
+
+int rough_draw_surface_smooth_rotated(rough_framebuffer *target,
+                rough_surface_shape shape, rough_rotation orientation, double distance) {
+    if (!target || !target->pixels || !target->depth) return -1;
+    return walk_surface(NULL, target, shape, 0.0, target->width, target->height,
+                        distance, 1, &orientation);
 }

@@ -176,13 +176,13 @@ static void redraw(rough_android_state *state) {
             state->aa_pixels, rw * 2u, rh * 2u, rw * 2u,
             state->aa_depth, rw * 2u
         };
-        draw_status = rough_draw_surface_aa2(
+        draw_status = rough_draw_surface_aa2_rotated(
             &target, &scratch, state->touch.shape,
-            state->touch.yaw_degrees, state->touch.camera_distance);
+            state->touch.orientation, state->touch.camera_distance);
     } else {
-        draw_status = rough_draw_surface(
+        draw_status = rough_draw_surface_rotated(
             &target, state->touch.shape,
-            state->touch.yaw_degrees, state->touch.camera_distance);
+            state->touch.orientation, state->touch.camera_distance);
     }
     if (draw_status) {
         log_error("Native surface supersampling/rasterization failed");
@@ -230,12 +230,13 @@ static void redraw(rough_android_state *state) {
         "off";
 #endif
     __android_log_print(ANDROID_LOG_INFO, ROUGH_TAG,
-                        "FRAME input_seq=%lu render_seq=%lu shape=%s yaw=%.4f "
+                        "FRAME input_seq=%lu render_seq=%lu shape=%s orientation=%.6f,%.6f,%.6f,%.6f "
                         "distance=%.4f surface=%ux%u rendered=%ux%u "
                         "painted=%u aa_samples=%u subpixel_panel=%s rgba_hash=%016llx",
                         state->input_sequence, state->render_sequence,
                         state->touch.shape == ROUGH_SURFACE_TORUS ? "torus" : "enneper",
-                        state->touch.yaw_degrees,
+                        state->touch.orientation.w, state->touch.orientation.x,
+                        state->touch.orientation.y, state->touch.orientation.z,
                         state->touch.camera_distance,
                         width, height, rw, rh, painted,
                         ROUGH_SUBPIXEL_QUALITY, panel_marker, (unsigned long long)hash);
@@ -293,6 +294,21 @@ static int32_t input_event(struct android_app *app, AInputEvent *event) {
     rough_touch_event type;
 
     if (kind == AMOTION_EVENT_ACTION_MOVE) {
+        if (state->touch.pinching) {
+            int changed = 0;
+            for (size_t i = 0; i < count; ++i) {
+                int result = rough_touch_apply(&state->touch, ROUGH_TOUCH_MOVE,
+                    AMotionEvent_getPointerId(event, i),
+                    AMotionEvent_getX(event, i), AMotionEvent_getY(event, i));
+                if (result < 0) return 0;
+                changed |= result;
+            }
+            if (changed) {
+                ++state->input_sequence;
+                state->dirty = 1;
+            }
+            return 1;
+        }
         index = count;
         for (size_t i = 0; i < count; ++i) {
             if (AMotionEvent_getPointerId(event, i) ==
@@ -341,7 +357,7 @@ void android_main(struct android_app *app) {
     app->onAppCmd = app_command;
     app->onInputEvent = input_event;
     __android_log_print(ANDROID_LOG_INFO, ROUGH_TAG,
-                        "NativeActivity ready; drag=rotate/zoom, tap=switch shape");
+                        "NativeActivity ready; drag=rotate, pinch=zoom, tap=switch shape");
 
     while (!app->destroyRequested) {
         struct android_poll_source *source = NULL;

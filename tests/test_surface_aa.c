@@ -186,6 +186,18 @@ static void test_real_math_surface(rough_surface_shape shape,
                                    yaw, distance) == -1);
     assert(rough_draw_surface_aa2(&aa, &high, shape, NAN, distance) == -1);
 
+    /* The Android quaternion route must rotate actual AA/smooth pixels. */
+    rough_rotation pose={cos(.21),sin(.21),0,0};
+    assert(rough_rotation_drag(pose,.3,.4,&pose)==0);
+    assert(rough_draw_surface_aa2_rotated(&aa,&high,shape,pose,distance)==0);
+    assert(memcmp(saved,pixels,count*sizeof *pixels)!=0);
+    memcpy(saved,pixels,count*sizeof *pixels);
+    assert(rough_draw_surface_aa2_rotated(&aa,&high,shape,pose,distance)==0);
+    assert(memcmp(saved,pixels,count*sizeof *pixels)==0);
+    assert(rough_draw_surface_aa2_rotated(&aa,&high,shape,
+                                         (rough_rotation){0,0,0,0},distance)==-1);
+    assert(memcmp(saved,pixels,count*sizeof *pixels)==0);
+
     free(saved);
     free(saved_depth);
     free(pixels);

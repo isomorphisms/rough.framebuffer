@@ -251,9 +251,9 @@ grep -Fq 'changed > 20u' "$out/reject-1x-silhouette.log"
 echo 'ICK depth-correct 2x2 subpixel silhouette and 1x mutant: PASS'
 # Independently reject reversed near-side drag semantics; changed frame hashes
 # alone falsely accepted the original defect. Compile the mutant with ICK too.
-sed 's/state->anchor_yaw -/state->anchor_yaw +/' \
+sed 's/dx \* (pi \/ state->width)/-dx * (pi \/ state->width)/' \
     "$repo_root/src/touch.c" > "$out/touch-backside-mutant.c"
-grep -Fq 'state->anchor_yaw +' "$out/touch-backside-mutant.c"
+grep -Fq -- '-dx * (pi / state->width)' "$out/touch-backside-mutant.c"
 "$ICK_CC" $flags -I"$repo_root/src" -c "$out/touch-backside-mutant.c" \
     -o "$out/touch-backside-mutant.o"
 "$HOST_LINKER" "$out/touch-backside-mutant.o" "$out/surface.o" \

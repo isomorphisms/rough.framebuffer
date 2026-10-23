@@ -21,7 +21,7 @@ adb exec-out screencap -p > build/android/emulator/after-restart.png
 adb logcat -d -s RoughFrameArt:I > build/android/emulator/native-frame-log.txt
 grep -E 'FRAME input_seq=.*painted=[1-9][0-9]*' build/android/emulator/native-frame-log.txt
 grep -Eq 'FRAME input_seq=.*aa_samples=4' build/android/emulator/native-frame-log.txt
-grep -Eq 'FRAME input_seq=.*shape=enneper.*distance=6\.[0-9]+' build/android/emulator/native-frame-log.txt
+grep -Eq 'FRAME input_seq=.*shape=enneper.*distance=5\.2000' build/android/emulator/native-frame-log.txt
 for image in before after-drag after-tap after-zoom after-restart {
     ffmpeg -hide_banner -loglevel error -y -i "build/android/emulator/$image.png" \
         -vf 'crop=iw*3/4:ih*2/3:iw/8:ih/6,scale=160:160' \
